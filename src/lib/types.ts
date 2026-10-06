@@ -3,7 +3,9 @@ export type Assignment = {
   title: string;
   course: string;
   dueDate: string;
+  /** Total estimated effort; completedMinutes records finished planned work. */
   estimateMinutes: number;
+  completedMinutes: number;
   createdAt: string;
 };
 
@@ -13,7 +15,7 @@ export type DailyAvailability = {
 };
 
 export type AssistantStudyContext = {
-  assignments: Array<Pick<Assignment, "id" | "title" | "course" | "dueDate" | "estimateMinutes">>;
+  assignments: Array<Pick<Assignment, "id" | "title" | "course" | "dueDate" | "estimateMinutes" | "completedMinutes">>;
   availability: DailyAvailability[];
 };
 
@@ -28,6 +30,7 @@ export type StudySession = {
 export type WeeklyPlan = {
   sessions: StudySession[];
   generatedAt: string;
+  weekStart: string;
   inputSignature: string;
 };
 

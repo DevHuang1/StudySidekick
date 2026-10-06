@@ -92,6 +92,7 @@ export function applyAssistantStudyChanges(
         course: action.course.trim(),
         dueDate: action.dueDate,
         estimateMinutes: action.estimateMinutes,
+        completedMinutes: 0,
         createdAt,
       }];
     } else if (action.type === "update_assignment") {

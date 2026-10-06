@@ -25,6 +25,7 @@ const studyContextSchema = z.object({
     course: z.string().min(1).max(80),
     dueDate: z.iso.date(),
     estimateMinutes: z.number().int().min(15).max(10080),
+    completedMinutes: z.number().int().min(0).max(2_147_483_647).default(0),
   }).strict()).max(120),
   availability: z.array(z.object({ date: z.iso.date(), minutes: z.number().int().min(0).max(720) }).strict())
     .length(7)

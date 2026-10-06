@@ -43,8 +43,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .hero-copy, .goal-progress { position: relative; z-index: 1; }
 .hero-copy h2 { max-width: 440px; margin: 11px 0 7px; font-size: clamp(21px,2.25vw,27px); line-height: 1.2; letter-spacing: -.8px; }
 .hero-copy p { max-width: 390px; margin: 0; color: #79756d; font-size: 12px; line-height: 1.6; }
-.hero-stat { display: flex; align-items: center; margin-top: 15px; color: #716b62; font-size: 12px; }
-.hero-stat b { font-weight: 800; }
 .goal-progress { --goal-start: #898093; --goal-end: #a78d76; display: flex; width: 100%; flex-direction: column; gap: 10px; padding: 13px 14px; border: 1px solid #eee9df; border-radius: 12px; background: #faf8f3; }
 .goal-progress.phase-start { --goal-start: #867890; --goal-end: #b18d70; }
 .goal-progress.phase-middle { --goal-start: #957984; --goal-end: #bd8768; }
@@ -70,7 +68,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .build-button, .primary-button { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; gap: 7px; padding: 0 14px; border: 0; border-radius: 9px; color: white; background: #695965; cursor: pointer; font-size: 12px; font-weight: 700; transition: background .18s, transform .18s; }
 .build-button:hover, .primary-button:hover { transform: translateY(-1px); background: #584955; }
 .build-button:disabled, .primary-button:disabled { cursor: not-allowed; opacity: .55; transform: none; }
+.availability-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 20px 12px; color: #716b62; font-size: 12px; }
+.availability-summary strong { color: #5d4f5b; font-weight: 600; }
+.availability-toggle { padding: 4px 0; border: 0; color: #766371; background: transparent; cursor: pointer; font-size: 12px; }
+.availability-toggle:hover { text-decoration: underline; text-underline-offset: 3px; }
 .availability-strip { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 7px; padding: 0 20px 17px; }
+.availability-strip[hidden] { display: none; }
 .availability-item { min-width: 0; padding: 9px 5px 7px; border: 1px solid #efedf4; border-radius: 12px; background: #fbfaff; text-align: center; }
 .availability-item.today { border-color: #c9bdb3; background: #f7f3ee; box-shadow: inset 0 2px 0 #9a7e6b; }
 .availability-day { display: block; overflow: hidden; color: #716b62; font-size: 11px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
@@ -80,6 +83,21 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .plan-alert { display: flex; align-items: flex-start; gap: 9px; margin: 0 20px 14px; padding: 11px 12px; border: 1px solid #ffe3c7; border-radius: 12px; color: #87582c; background: #fff9f1; font-size: 12px; line-height: 1.5; }
 .plan-alert.overload { border-color: #ffd7d0; color: #934b44; background: #fff6f4; }
 .alert-icon { font-size: 14px; }
+.replan-review { margin: 0 20px 16px; padding: 15px; border: 1px solid #dfd5ce; border-radius: 14px; background: #fcf8f4; }
+.replan-review-heading h3 { margin: 0; color: #413b45; font-size: 14px; font-weight: 700; }
+.replan-review-heading p { margin: 5px 0 0; color: #777168; font-size: 12px; line-height: 1.45; }
+.replan-preview-days { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; max-height: 260px; overflow: auto; margin-top: 12px; }
+.replan-preview-day { min-width: 0; padding: 9px 10px; border: 1px solid #eee8e2; border-radius: 10px; background: #fffdfa; }
+.replan-preview-day > strong { display: block; margin-bottom: 6px; color: #5d4f5b; font-size: 11px; font-weight: 700; }
+.replan-preview-day ul { display: grid; gap: 5px; padding: 0; margin: 0; list-style: none; }
+.replan-preview-day li { display: flex; justify-content: space-between; gap: 8px; color: #514a52; font-size: 11px; }
+.replan-preview-day li span { overflow: hidden; text-overflow: ellipsis; }
+.replan-preview-day li b { flex: 0 0 auto; color: #766371; font-size: 10px; font-weight: 650; }
+.replan-day-empty { color: #898377; font-size: 11px; }
+.replan-outcome { display: grid; gap: 3px; padding: 9px 10px; margin-top: 8px; border: 1px solid #e8dfd7; border-radius: 9px; color: #62564e; background: #f8f3ed; font-size: 11px; line-height: 1.4; }
+.replan-outcome.overload { border-color: #f0d7d0; color: #934b44; background: #fff6f4; }
+.replan-review-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.saved-plan-label { margin: 0 20px 9px; color: #777168; font-size: 11px; font-weight: 650; }
 .day-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; padding: 0 20px 19px; }
 .day-card { min-width: 0; padding: 13px 12px 10px; border: 1px solid #efedf4; border-radius: 15px; background: #fff; transition: border-color .2s, box-shadow .2s; }
 .day-card.today { border-color: #d9cfc4; background: #fffdfa; }
@@ -100,8 +118,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .session-done .session-title { color: #9e9aa8; text-decoration: line-through; }
 .session-duration { color: #5d4f5b; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .move-control { grid-column: 2 / 4; display: flex; align-items: center; gap: 6px; margin-top: 1px; }
-.move-control label { color: #716b62; font-size: 11px; }
 .move-select { max-width: 145px; padding: 5px 7px; border: 1px solid #e5e0d7; border-radius: 6px; color: #49443e; background: #fff; font-size: 11px; }
+.session-focus-button { grid-column: 2 / 4; justify-self: start; padding: 2px 0; border: 0; color: #766371; background: transparent; cursor: pointer; font-size: 11px; }
+.session-focus-button:hover { color: #624a5c; text-decoration: underline; text-underline-offset: 3px; }
 .empty-day { padding: 14px 2px 12px; color: #777168; font-size: 11px; text-align: center; }
 .empty-day strong { display: block; margin-bottom: 3px; color: #5b554e; font-size: 12px; }
 .day-available { display: flex; justify-content: space-between; padding-top: 9px; margin-top: 9px; border-top: 1px dashed #efedf3; color: #716b62; font-size: 11px; }
@@ -116,6 +135,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .backlog-copy, .assignment-copy { min-width: 0; }
 .backlog-copy strong, .assignment-copy strong { display: block; overflow: hidden; color: #413b45; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .backlog-copy span, .assignment-copy span { display: block; margin-top: 4px; color: #777168; font-size: 11px; }
+.assignment-copy span + span { color: #6d625f; }
 .backlog-minutes { flex: 0 0 auto; color: #5d4f5b; font-size: 11px; font-weight: 700; }
 .inline-actions { display: flex; gap: 5px; }
 .quiet-button { min-height: 32px; padding: 0 10px; border: 1px solid #e5e0d7; border-radius: 7px; color: #5f5763; background: white; cursor: pointer; font-size: 12px; font-weight: 650; }
@@ -165,7 +185,19 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .focus-timer-face { margin: 0 0 9px; font-size: clamp(64px,10vw,88px); letter-spacing: -4px; }
 .focus-card .timer-controls { max-width: 370px; margin: 22px auto 0; }
 .focus-card .timer-controls .primary-button { min-height: 46px; font-size: 12px; }
+.focus-linked-block { display: grid; gap: 4px; max-width: 370px; padding: 0; margin: 0 auto 22px; color: #51464f; text-align: center; }
+.focus-linked-block > span { color: #766b72; font-size: 11px; }
+.focus-linked-block strong { overflow: hidden; font-size: 13px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+.focus-linked-block small { color: #766b72; font-size: 11px; }
+.focus-completion { display: grid; gap: 9px; max-width: 370px; padding: 14px 0 0; margin: 14px auto 0; border-top: 1px solid #e4d8e0; color: #5d4f5b; }
+.focus-completion p { margin: 0; font-size: 12px; line-height: 1.5; }
+.focus-completion p strong { font-weight: 600; }
+.focus-completion-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.focus-completion-actions .primary-button { min-height: 34px; }
+.focus-block-picker { max-width: 370px; margin: 22px auto 0; }
 .focus-duration { max-width: 370px; margin: 22px auto 0; }
+.focus-duration-note { display: flex; max-width: 370px; align-items: center; justify-content: space-between; padding: 12px 2px; margin: 22px auto 0; border-top: 1px solid #efebe4; color: #716b62; font-size: 12px; }
+.focus-duration-note strong { color: #5d4f5b; font-weight: 550; }
 .reminders-page { max-width: 820px; overflow: hidden; }
 .reminders-form { display: grid; grid-template-columns: minmax(0,1fr) minmax(220px,.7fr) auto; align-items: end; gap: 11px; padding: 0 20px 20px; }
 .reminders-form .field input { height: 40px; }
@@ -312,6 +344,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
   .panel-header { padding: 16px 13px 12px; }
   .panel-title { font-size: 16px; }
   .build-button { min-height: 38px; padding-inline: 11px; font-size: 11px; }
+  .replan-review { margin-inline: 12px; padding: 12px; }
+  .replan-preview-days { grid-template-columns: minmax(0,1fr); max-height: 220px; }
+  .saved-plan-label { margin-inline: 12px; }
+  .availability-summary { padding-inline: 12px; }
   .availability-strip { gap: 4px; padding: 0 12px 13px; }
   .availability-item { padding: 7px 2px 6px; border-radius: 9px; }
   .availability-day { font-size: 10px; }
@@ -582,9 +618,9 @@ html[data-theme="dark"] .goal-meta,
 html[data-theme="dark"] .availability-day,
 html[data-theme="dark"] .availability-date,
 html[data-theme="dark"] .availability-unit,
+html[data-theme="dark"] .availability-summary,
 html[data-theme="dark"] .day-name span,
 html[data-theme="dark"] .session-course,
-html[data-theme="dark"] .move-control label,
 html[data-theme="dark"] .empty-day,
 html[data-theme="dark"] .day-available,
 html[data-theme="dark"] .panel-footnote,
@@ -603,8 +639,7 @@ html[data-theme="dark"] .privacy-note { color: #bcb7ab; }
 html[data-theme="dark"] .week-chip { border-color: #4a454c; color: #d0c8ba; background: #2b292e; }
 html[data-theme="dark"] .hero-card { border-color: #47434a; color: #eeeae0; background: #2a282c; }
 html[data-theme="dark"] .hero-copy h2 { color: #eeeae0; }
-html[data-theme="dark"] .hero-copy p,
-html[data-theme="dark"] .hero-stat { color: #c2bdb2; }
+html[data-theme="dark"] .hero-copy p { color: #c2bdb2; }
 html[data-theme="dark"] .goal-progress { --goal-start: #a795aa; --goal-end: #c6a18b; border-color: #47434a; background: #242226; }
 html[data-theme="dark"] .goal-progress.phase-start { --goal-start: #a99ab2; --goal-end: #c5a18b; }
 html[data-theme="dark"] .goal-progress.phase-middle { --goal-start: #b491a8; --goal-end: #cda188; }
@@ -625,6 +660,9 @@ html[data-theme="dark"] .primary-button:hover { background: #796573; }
 html[data-theme="dark"] .build-button:hover { background: #796573; }
 html[data-theme="dark"] .availability-item { border-color: #444149; background: #262428; }
 html[data-theme="dark"] .availability-item.today { border-color: #796b78; background: #302b30; box-shadow: inset 0 2px 0 #a98b9e; }
+html[data-theme="dark"] .availability-summary strong { color: #e0cbb8; }
+html[data-theme="dark"] .availability-toggle { color: #d0b7c7; }
+html[data-theme="dark"] .availability-toggle:hover { color: #ead8e5; }
 html[data-theme="dark"] .availability-input,
 html[data-theme="dark"] .field input,
 html[data-theme="dark"] .field select,
@@ -641,6 +679,17 @@ html[data-theme="dark"] .sidekick-composer textarea::placeholder { color: #aaa49
 html[data-theme="dark"] .plan-alert { border-color: #63533d; color: #e7c99d; background: #332e24; }
 html[data-theme="dark"] .plan-alert.overload { border-color: #694644; color: #edb4a9; background: #352725; }
 html[data-theme="dark"] .plan-alert strong { color: inherit; }
+html[data-theme="dark"] .replan-review { border-color: #51494f; background: #28262a; }
+html[data-theme="dark"] .replan-review-heading h3 { color: #eeeae0; }
+html[data-theme="dark"] .replan-review-heading p,
+html[data-theme="dark"] .replan-day-empty { color: #bcb7ab; }
+html[data-theme="dark"] .replan-preview-day { border-color: #444149; background: #302d32; }
+html[data-theme="dark"] .replan-preview-day > strong { color: #d4c0aa; }
+html[data-theme="dark"] .replan-preview-day li { color: #e9e4d9; }
+html[data-theme="dark"] .replan-preview-day li b { color: #d4c0aa; }
+html[data-theme="dark"] .replan-outcome { border-color: #51494f; color: #d4cec1; background: #302d32; }
+html[data-theme="dark"] .replan-outcome.overload { border-color: #694644; color: #edb4a9; background: #352725; }
+html[data-theme="dark"] .saved-plan-label { color: #bcb7ab; }
 html[data-theme="dark"] .text-link { color: #d0b293; }
 html[data-theme="dark"] .day-card { border-color: #444149; background: #262428; }
 html[data-theme="dark"] .day-card.today { border-color: #796b74; background: #2d292e; }
@@ -656,6 +705,8 @@ html[data-theme="dark"] .session-title { color: #e9e4d9; }
 html[data-theme="dark"] .session-course { color: #bcb7ab; }
 html[data-theme="dark"] .session-duration,
 html[data-theme="dark"] .backlog-minutes { color: #d4c0aa; }
+html[data-theme="dark"] .session-focus-button { color: #d0b7c7; }
+html[data-theme="dark"] .session-focus-button:hover { color: #ead8e5; }
 html[data-theme="dark"] .session-done .session-title { color: #aaa69a; }
 html[data-theme="dark"] .session-check,
 html[data-theme="dark"] .reminder-row input { accent-color: #bd9eaf; }
@@ -673,6 +724,13 @@ html[data-theme="dark"] .icon-button:hover { border-color: #85554b; color: #f0c0
 html[data-theme="dark"] .form-error,
 html[data-theme="dark"] .assistant-error { color: #f1aaa0; }
 html[data-theme="dark"] .timer-face span { color: #9d998d; }
+html[data-theme="dark"] .focus-linked-block,
+html[data-theme="dark"] .focus-completion { color: #e2d8df; }
+html[data-theme="dark"] .focus-completion { border-color: #51494f; }
+html[data-theme="dark"] .focus-linked-block > span,
+html[data-theme="dark"] .focus-linked-block small { color: #bcb2ba; }
+html[data-theme="dark"] .focus-duration-note { border-color: #49444c; color: #bcb7ab; }
+html[data-theme="dark"] .focus-duration-note strong { color: #d4c0aa; }
 html[data-theme="dark"] .timer-reset:hover { border-color: #796b78; background: #39333a; }
 html[data-theme="dark"] .reminder-done .reminder-copy { color: #bcb7ab; }
 html[data-theme="dark"] .sidekick-bar { border-color: #49444c; color: #d0cabe; }

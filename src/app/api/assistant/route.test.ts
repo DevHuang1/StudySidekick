@@ -86,6 +86,8 @@ describe("Groq assistant provider", () => {
     expect(response.status).toBe(200);
     expect(JSON.stringify(body.messages)).toContain("PRIVATE HISTORY ESSAY");
     expect(JSON.stringify(body.messages)).toContain("private-id-1");
+    const contextMessage = body.messages.find((message: { content: string }) => message.content.includes("Current saved study data"));
+    expect(contextMessage?.content).toContain('"completedMinutes":0');
   });
 
   it("returns the complete demo handoff without sending saved study data to Groq", async () => {

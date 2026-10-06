@@ -6,7 +6,7 @@ import type { AssistantAction, AssistantStudyContext, Assignment, DailyAvailabil
 const today = "2026-10-02";
 const dates = ["2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08"];
 const context: AssistantStudyContext = {
-  assignments: [{ id: "essay-1", title: "History essay", course: "History", dueDate: "2026-10-06", estimateMinutes: 180 }],
+  assignments: [{ id: "essay-1", title: "History essay", course: "History", dueDate: "2026-10-06", estimateMinutes: 180, completedMinutes: 30 }],
   availability: dates.map((date) => ({ date, minutes: 60 })),
 };
 const assignments: Assignment[] = [{ ...context.assignments[0], createdAt: "2026-10-01T12:00:00.000Z" }];
@@ -86,7 +86,7 @@ describe("assistant study actions", () => {
     expect(defaultAvailability[1].minutes).toBe(120);
 
     const applied = applyAssistantProposal(emptyAssignments, defaultAvailability, [], actions, "confirmed-time", () => "demo-reminder");
-    expect(applied.assignments).toMatchObject([{ id: "demo-lab", estimateMinutes: 180 }]);
+    expect(applied.assignments).toMatchObject([{ id: "demo-lab", estimateMinutes: 180, completedMinutes: 0 }]);
     expect(applied.availability.slice(0, 2)).toEqual([{ date: today, minutes: 90 }, { date: dates[1], minutes: 30 }]);
     expect(applied.reminders).toMatchObject([{ id: "demo-reminder", text: "Review the lab sources", done: false }]);
     expect(applied.focusMinutes).toBe(25);

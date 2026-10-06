@@ -8,7 +8,7 @@ import { assistantReplySchema } from "@/lib/assistant-schema";
 import { applyAssistantProposal, applyAssistantStudyChanges, validateAssistantActions } from "@/lib/assistant-actions";
 import { formatDate, formatDueDate } from "@/lib/date-utils";
 import { buildDemoRequest } from "@/lib/demo-prompt";
-import { buildSchedule } from "@/lib/scheduler";
+import { buildSchedule, completedSessionsForWeek, planInputSignature } from "@/lib/scheduler";
 import type { AssistantProvider, AssistantProviderChoice, AssistantStudyContext, Assignment, PendingAssistantAction } from "@/lib/types";
 
 type ChatMessage = { id: string; role: "user" | "assistant"; content: string };
@@ -32,13 +32,9 @@ function formatMinutes(minutes: number) {
   return rest ? `${hours}h ${rest}m` : `${hours}h`;
 }
 
-function signatureFor(assignments: Assignment[], availability: AssistantStudyContext["availability"]) {
-  return JSON.stringify({ assignments, availability });
-}
-
 function toStudyContext(assignments: Assignment[], availability: AssistantStudyContext["availability"]): AssistantStudyContext {
   return {
-    assignments: assignments.map(({ id, title, course, dueDate, estimateMinutes }) => ({ id, title, course, dueDate, estimateMinutes })),
+    assignments: assignments.map(({ id, title, course, dueDate, estimateMinutes, completedMinutes }) => ({ id, title, course, dueDate, estimateMinutes, completedMinutes })),
     availability,
   };
 }
@@ -46,14 +42,14 @@ function toStudyContext(assignments: Assignment[], availability: AssistantStudyC
 function describeAction(action: PendingAssistantAction, today: string, assignments: Assignment[], availability: AssistantStudyContext["availability"]) {
   switch (action.type) {
     case "add_assignment":
-      return <>Add <strong>{action.title}</strong> for {action.course}, due {formatDueDate(action.dueDate, today)} · {formatMinutes(action.estimateMinutes)}</>;
+      return <>Add <strong>{action.title}</strong> for {action.course}, due {formatDueDate(action.dueDate, today)} · {formatMinutes(action.estimateMinutes)} total effort</>;
     case "update_assignment": {
       const current = assignments.find((assignment) => assignment.id === action.assignmentId);
       if (!current) return <>Update an assignment</>;
       const changes = Object.entries(action.changes).map(([field, value]) => {
         const before = field === "estimateMinutes" ? formatMinutes(Number(current[field as keyof Assignment])) : String(current[field as keyof Assignment]);
         const after = field === "estimateMinutes" ? formatMinutes(Number(value)) : String(value);
-        const label = field === "dueDate" ? "due date" : field === "estimateMinutes" ? "effort" : field;
+        const label = field === "dueDate" ? "due date" : field === "estimateMinutes" ? "total effort" : field;
         const formattedBefore = field === "dueDate" ? formatDueDate(before, today) : before;
         const formattedAfter = field === "dueDate" ? formatDueDate(after, today) : after;
         return `${label}: ${formattedBefore} → ${formattedAfter}`;
@@ -159,7 +155,13 @@ export default function SidekickPage() {
           actions,
           assignmentsAfter: updated.assignments,
           availabilityAfter: updated.availability,
-          planPreview: willBuild ? buildSchedule(updated.assignments, updated.availability, dates, today) : null,
+          planPreview: willBuild ? buildSchedule(
+            updated.assignments,
+            updated.availability,
+            dates,
+            today,
+            completedSessionsForWeek(plan?.sessions ?? [], updated.assignments, dates),
+          ) : null,
         });
       }
     } catch (requestError) {
@@ -192,15 +194,14 @@ export default function SidekickPage() {
     if (applied.addedReminders.length) setReminders(applied.reminders);
 
     if (applied.shouldBuildPlan) {
-      const result = proposal.planPreview ?? buildSchedule(applied.assignments, applied.availability, dates, today);
-      const previous = new Map((plan?.sessions ?? []).map((session) => [session.id, session]));
-      const sessions = result.sessions.map((session) => {
-        const old = previous.get(session.id);
-        return old && old.assignmentId === session.assignmentId && old.date === session.date && old.minutes === session.minutes
-          ? { ...session, completed: old.completed }
-          : session;
-      });
-      setPlan({ sessions, generatedAt: new Date().toISOString(), inputSignature: signatureFor(applied.assignments, applied.availability) });
+      const result = proposal.planPreview ?? buildSchedule(
+        applied.assignments,
+        applied.availability,
+        dates,
+        today,
+        completedSessionsForWeek(plan?.sessions ?? [], applied.assignments, dates),
+      );
+      setPlan({ sessions: result.sessions, generatedAt: new Date().toISOString(), weekStart: today, inputSignature: planInputSignature(applied.assignments, applied.availability) });
     }
 
     if (applied.focusMinutes !== null) startTimer(applied.focusMinutes);
@@ -253,9 +254,9 @@ export default function SidekickPage() {
           <ul className="proposal-list">{proposal.actions.map((action, index) => <li key={`${action.type}-${index}`}><span className="proposal-check" aria-hidden="true">✓</span><span>{today ? describeAction(action, today, assignments, availability) : "Review proposed change"}</span></li>)}</ul>
           {proposal.planPreview && <div className="proposal-plan-preview">
             <div className="proposal-plan-summary"><strong>{proposal.planPreview.sessions.length} study blocks</strong><span>{proposal.planPreview.shortfalls.length ? `${formatMinutes(proposal.planPreview.shortfalls.reduce((sum, item) => sum + item.minutes, 0))} won’t fit before deadlines` : "Within your saved daily hours"}</span>{proposal.planPreview.backlog.length > 0 && <span>{proposal.planPreview.backlog.length} later assignment{proposal.planPreview.backlog.length === 1 ? "" : "s"} stay in the backlog</span>}</div>
-            {proposal.planPreview.sessions.length > 0 ? <div className="proposal-schedule-days">{[...sessionsByDate.entries()].map(([date, sessions]) => <div className="proposal-schedule-day" key={date}><strong>{formatDate(date)}</strong><ul>{sessions.map((session) => <li key={session.id}>{assignmentsById.get(session.assignmentId)?.title ?? "Assignment"} · {formatMinutes(session.minutes)}</li>)}</ul></div>)}</div> : <p className="proposal-empty-plan">No study blocks fit into the available hours before these deadlines.</p>}
+            {proposal.planPreview.sessions.length > 0 ? <div className="proposal-schedule-days">{[...sessionsByDate.entries()].map(([date, sessions]) => <div className="proposal-schedule-day" key={date}><strong>{formatDate(date)}</strong><ul>{sessions.map((session) => <li key={session.id}>{assignmentsById.get(session.assignmentId)?.title ?? "Assignment"} · {formatMinutes(session.minutes)}{session.completed ? " · done" : ""}</li>)}</ul></div>)}</div> : <p className="proposal-empty-plan">No study blocks fit into the available hours before these deadlines.</p>}
             {proposal.planPreview.shortfalls.length > 0 && <p className="proposal-tradeoff"><strong>Shortfall:</strong> {proposal.planPreview.shortfalls.map((item) => `${assignmentsById.get(item.assignmentId)?.title ?? "Assignment"} ${formatMinutes(item.minutes)}${item.reason === "overdue" ? " overdue" : " over capacity"}`).join(" · ")}. Increase study time or move a deadline.</p>}
-            {proposal.planPreview.backlog.length > 0 && <p className="proposal-tradeoff"><strong>Backlog:</strong> {proposal.planPreview.backlog.map((item) => item.title).join(", ")} — due after this seven-day plan.</p>}
+            {proposal.planPreview.backlog.length > 0 && <p className="proposal-tradeoff"><strong>Backlog:</strong> {proposal.planPreview.backlog.map((item) => `${item.title} (${formatMinutes(item.remainingMinutes)} left)`).join(", ")} — due after this seven-day plan.</p>}
           </div>}
           {proposalAddsPlan && !proposal.assignmentsAfter.length && <p className="form-error">Add an assignment before building a study week. <Link href="/assignments">Open assignments</Link>.</p>}
           <div className="proposal-actions"><button className="primary-button" type="button" onClick={confirmProposal} disabled={!proposalCanApply}>Apply all</button><button className="quiet-button" type="button" onClick={dismissProposal}>Not now</button></div>

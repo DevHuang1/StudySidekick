@@ -17,7 +17,7 @@ Open <http://localhost:3000>. No account, API key, AWS account, paid API, or phy
 
 ## Assignments, focus, and reminders
 
-Add or edit assignment details on the **Assignments** page. Set your focus length and start a countdown on **Focus timer**; it continues while you navigate to another page. Keep a browser-only checklist on **Reminders**. Reminders do not send operating-system notifications.
+Add or edit assignment details on the **Assignments** page. Estimates are total effort; completed planned time is tracked separately and the app shows what remains. Set your focus length and start a countdown on **Focus timer**; it continues while you navigate to another page. Keep a browser-only checklist on **Reminders**. Reminders do not send operating-system notifications.
 
 Assignments, availability, plans, completion state, reminders, and focus-length preference stay in this browser's local storage. Clearing browser storage removes that data. There is no account, sync, hosted database, or cloud hosting.
 
@@ -25,13 +25,13 @@ The light/dark appearance follows your device preference until you choose a mode
 
 ## Build a study week
 
-1. Add each assignment's title, course, due date, and estimated remaining effort.
+1. Add each assignment's title, course, due date, and estimated total effort.
 2. Set your available study hours for each of the next seven days. The initial suggestion is two hours per day; change it to match your real schedule.
 3. Choose **Build my week**. The deterministic planner schedules the nearest deadlines first, divides larger assignments into short blocks, and never allocates more than the daily capacity you set.
 4. If work cannot fit before its due date, the planner shows the remaining time and possible trade-offs. Later deadlines appear in the backlog.
-5. Check off completed blocks, or choose a new day and confirm the move. Moves past a due date or beyond a day's capacity are rejected.
+5. Check off completed blocks, or choose a new day and confirm the move. Moves past a due date or beyond a day's capacity are rejected. Checked time updates the assignment's done/total/left figures.
 
-Progress is completed planned minutes divided by total planned minutes. Assignments and availability edits do not silently rewrite a saved plan; use **Rebuild my week** when you want to apply them.
+Progress is completed planned minutes divided by the active seven-day plan. Assignment-level done/total/left figures persist across plan rebuilds and week rollovers. Assignments and availability edits do not silently rewrite a saved plan; choose **Review replan** to preview the remaining schedule and any deadline shortfall, then **Use this week** to apply it or **Keep current plan** to discard the preview. Checked blocks in the active seven-day window remain checked and reserve their time; unfinished placements are regenerated within the updated capacity.
 
 ## Let Sidekick handle a request
 
