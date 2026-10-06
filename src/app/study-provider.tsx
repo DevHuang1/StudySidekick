@@ -1,199 +1,205 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
-import { getWeekDates, localDateKey } from "@/lib/date-utils";
-import { normalizeAssignmentProgress } from "@/lib/progress";
-import type { Assignment, DailyAvailability, Reminder, StoredStudyData, WeeklyPlan } from "@/lib/types";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
+import { localDateKey } from "@/lib/date-utils";
+import {
+  attachCrossTabSync,
+  getClockSignal,
+  getServerStudySnapshot,
+  getStudySnapshot,
+  subscribeToClockSignal,
+  subscribeToStudy,
+  syncToday,
+  updateAssignments as storeUpdateAssignments,
+  updateAvailability as storeUpdateAvailability,
+  updateFocusMinutes as storeUpdateFocusMinutes,
+  updateFocusSession as storeUpdateFocusSession,
+  updatePlan as storeUpdatePlan,
+  updateReminders as storeUpdateReminders,
+} from "@/lib/study-store";
+import type { Assignment, DailyAvailability, Reminder, WeeklyPlan } from "@/lib/types";
 
-const STORAGE_KEY = "study-sidekick.next.v1";
-const LEGACY_REMINDERS_KEY = "study-sidekick.reminders.v1";
-
-type StudyContextValue = {
+export type StudyContextValue = {
   today: string | null;
   dates: string[];
   ready: boolean;
   assignments: Assignment[];
-  setAssignments: Dispatch<SetStateAction<Assignment[]>>;
+  setAssignments: (action: SetStateAction<Assignment[]>) => void;
   availability: DailyAvailability[];
-  setAvailability: Dispatch<SetStateAction<DailyAvailability[]>>;
+  setAvailability: (action: SetStateAction<DailyAvailability[]>) => void;
   plan: WeeklyPlan | null;
-  setPlan: Dispatch<SetStateAction<WeeklyPlan | null>>;
+  setPlan: (action: SetStateAction<WeeklyPlan | null>) => void;
   reminders: Reminder[];
-  setReminders: Dispatch<SetStateAction<Reminder[]>>;
+  setReminders: (action: SetStateAction<Reminder[]>) => void;
   focusMinutes: number;
-  setFocusMinutes: Dispatch<SetStateAction<number>>;
   setFocusLength: (minutes: number) => void;
   timerDurationMinutes: number;
   secondsRemaining: number;
-  setSecondsRemaining: Dispatch<SetStateAction<number>>;
   timerRunning: boolean;
-  setTimerRunning: Dispatch<SetStateAction<boolean>>;
   activeFocusSessionId: string | null;
   clearFocusSession: () => void;
   startTimer: (minutes?: number) => void;
   startPlannedFocus: (sessionId: string, minutes: number) => boolean;
   pauseTimer: () => void;
+  resumeTimer: () => void;
   resetTimer: () => void;
   toast: string;
-  setToast: Dispatch<SetStateAction<string>>;
+  setToast: (message: string) => void;
 };
 
 const StudyContext = createContext<StudyContextValue | null>(null);
 
-function newId() {
-  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function defaultAvailability(dates: string[]): DailyAvailability[] {
-  return dates.map((date) => ({ date, minutes: 120 }));
-}
-
-function loadSavedData(dates: string[]): StoredStudyData {
-  const initial: StoredStudyData = {
-    assignments: [], availability: defaultAvailability(dates), plan: null,
-    reminders: [], focusMinutes: 25,
-  };
-
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const saved = JSON.parse(raw) as Partial<StoredStudyData>;
-      const savedAvailability = Array.isArray(saved.availability) ? saved.availability : [];
-      const savedPlan = saved.plan && Array.isArray(saved.plan.sessions) && typeof saved.plan.generatedAt === "string"
-        ? { ...saved.plan, weekStart: typeof saved.plan.weekStart === "string" ? saved.plan.weekStart : dates[0] }
-        : null;
-      const savedAssignments = Array.isArray(saved.assignments)
-        ? saved.assignments.filter((item) => item && typeof item.id === "string" && typeof item.title === "string" && typeof item.course === "string" && typeof item.dueDate === "string" && typeof item.estimateMinutes === "number")
-        : [];
-      return {
-        assignments: normalizeAssignmentProgress(savedAssignments, savedPlan?.sessions ?? []),
-        availability: dates.map((date) => {
-          const matching = savedAvailability.find((item) => item?.date === date);
-          return { date, minutes: typeof matching?.minutes === "number" ? Math.max(0, Math.min(720, matching.minutes)) : 120 };
-        }),
-        plan: savedPlan,
-        reminders: Array.isArray(saved.reminders) ? saved.reminders.filter((item) => item && typeof item.id === "string" && typeof item.text === "string") : [],
-        focusMinutes: typeof saved.focusMinutes === "number" ? Math.max(1, Math.min(180, saved.focusMinutes)) : 25,
-      };
-    }
-
-    // Preserve reminders from the original static prototype.
-    const legacy = localStorage.getItem(LEGACY_REMINDERS_KEY);
-    if (legacy) {
-      const reminders = JSON.parse(legacy) as Array<{ id?: string; text?: string; due?: string; done?: boolean }>;
-      if (Array.isArray(reminders)) {
-        initial.reminders = reminders
-          .filter((item) => typeof item.text === "string")
-          .map((item) => ({ id: item.id || newId(), text: item.text!, dueAt: item.due || null, done: Boolean(item.done) }));
-      }
-    }
-  } catch {
-    // Invalid browser data should not stop the planner from opening.
-  }
-  return initial;
+function safeDuration(minutes: number): number {
+  return Math.max(1, Math.min(180, Math.round(minutes)));
 }
 
 export function StudyProvider({ children }: { children: ReactNode }) {
-  const [today, setToday] = useState<string | null>(null);
-  const [dates, setDates] = useState<string[]>([]);
-  const [ready, setReady] = useState(false);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [availability, setAvailability] = useState<DailyAvailability[]>([]);
-  const [plan, setPlan] = useState<WeeklyPlan | null>(null);
-  const [reminders, setReminders] = useState<Reminder[]>([]);
-  const [focusMinutes, setFocusMinutes] = useState(25);
-  const [timerDurationMinutes, setTimerDurationMinutes] = useState(25);
-  const [secondsRemaining, setSecondsRemaining] = useState(25 * 60);
-  const [timerRunning, setTimerRunning] = useState(false);
-  const [activeFocusSessionId, setActiveFocusSessionId] = useState<string | null>(null);
-  const [toast, setToast] = useState("");
+  const { hydrated, today, dates, assignments, availability, plan, reminders, focusMinutes, focusSession } =
+    useSyncExternalStore(subscribeToStudy, getStudySnapshot, getServerStudySnapshot);
 
+  // Subscribing only while a timer is running keeps the clock store idle otherwise.
+  const endsAt = focusSession.endsAt;
+  const now = useSyncExternalStore(subscribeToClockSignal, getClockSignal, getClockSignal);
+
+  const [toast, setToastState] = useState("");
+  const announcedRun = useRef<string | null>(null);
+
+  const setAssignments = useCallback((action: SetStateAction<Assignment[]>) => storeUpdateAssignments(action), []);
+  const setAvailability = useCallback((action: SetStateAction<DailyAvailability[]>) => storeUpdateAvailability(action), []);
+  const setPlan = useCallback((action: SetStateAction<WeeklyPlan | null>) => storeUpdatePlan(action), []);
+  const setReminders = useCallback((action: SetStateAction<Reminder[]>) => storeUpdateReminders(action), []);
+  const setToast = useCallback((message: string) => setToastState(message), []);
+
+  const endsAtMs = endsAt ? Date.parse(endsAt) : null;
+  const secondsRemaining = endsAtMs !== null
+    ? Math.max(0, Math.ceil((endsAtMs - now) / 1000))
+    : focusSession.pausedSeconds ?? focusSession.durationMinutes * 60;
+  const timerRunning = endsAtMs !== null && secondsRemaining > 0;
+
+  // Adopt writes made by other open tabs.
+  useEffect(() => attachCrossTabSync(), []);
+
+  // Roll the seven-day window forward when the calendar date changes.
   useEffect(() => {
+    if (!hydrated) return;
     const currentDate = localDateKey(new Date());
-    const nextDates = getWeekDates(new Date(`${currentDate}T12:00:00`));
-    const saved = loadSavedData(nextDates);
-    setToday(currentDate);
-    setDates(nextDates);
-    setAssignments(saved.assignments);
-    setAvailability(saved.availability);
-    setPlan(saved.plan);
-    setReminders(saved.reminders);
-    setFocusMinutes(saved.focusMinutes);
-    setTimerDurationMinutes(saved.focusMinutes);
-    setSecondsRemaining(saved.focusMinutes * 60);
-    setReady(true);
-  }, []);
+    if (currentDate !== today) syncToday(currentDate);
+  }, [hydrated, today]);
 
+  // Stop the clock at zero and report completion once per run.
   useEffect(() => {
-    if (!ready) return;
-    const saved: StoredStudyData = { assignments, availability, plan, reminders, focusMinutes };
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
-    } catch {
-      setToast("Browser storage is unavailable. Your latest changes may not survive a refresh.");
-    }
-  }, [ready, assignments, availability, plan, reminders, focusMinutes]);
-
-  useEffect(() => {
-    if (!timerRunning) return;
-    const timer = window.setInterval(() => setSecondsRemaining((remaining) => Math.max(0, remaining - 1)), 1000);
-    return () => window.clearInterval(timer);
-  }, [timerRunning]);
-
-  useEffect(() => {
-    if (timerRunning && secondsRemaining === 0) {
-      setTimerRunning(false);
-      setToast("Focus session complete — nice work. Take a short break before the next block.");
-    }
-  }, [timerRunning, secondsRemaining]);
+    if (endsAt === null || secondsRemaining > 0) return;
+    if (announcedRun.current === endsAt) return;
+    announcedRun.current = endsAt;
+    storeUpdateFocusSession({ ...focusSession, endsAt: null, pausedSeconds: 0 });
+    setToastState(focusSession.sessionId
+      ? "Focus block finished — confirm it below to record the time."
+      : "Focus session complete — nice work. Take a short break before the next block.");
+  }, [endsAt, secondsRemaining, focusSession]);
 
   useEffect(() => {
     if (!toast) return;
-    const timeout = window.setTimeout(() => setToast(""), 4400);
+    const timeout = window.setTimeout(() => setToastState(""), 4400);
     return () => window.clearTimeout(timeout);
   }, [toast]);
 
-  function startTimer(minutes = focusMinutes) {
-    const safeMinutes = Math.max(1, Math.min(180, minutes));
-    setActiveFocusSessionId(null);
-    setFocusMinutes(safeMinutes);
-    setTimerDurationMinutes(safeMinutes);
-    setSecondsRemaining(safeMinutes * 60);
-    setTimerRunning(true);
-  }
+  const startTimer = useCallback((minutes = focusMinutes) => {
+    const duration = safeDuration(minutes);
+    // Deliberately leaves the saved focusMinutes preference untouched, so an
+    // assistant-requested length cannot overwrite the user's chosen default.
+    storeUpdateFocusSession({
+      endsAt: new Date(Date.now() + duration * 60_000).toISOString(),
+      pausedSeconds: null,
+      durationMinutes: duration,
+      sessionId: null,
+    });
+  }, [focusMinutes]);
 
-  function setFocusLength(minutes: number) {
-    const safeMinutes = Math.max(1, Math.min(180, minutes));
-    setFocusMinutes(safeMinutes);
-    setTimerDurationMinutes(safeMinutes);
-    setSecondsRemaining(safeMinutes * 60);
-  }
-
-  function startPlannedFocus(sessionId: string, minutes: number) {
-    if (timerRunning) return false;
-    const safeMinutes = Math.max(1, Math.min(180, minutes));
-    setActiveFocusSessionId(sessionId);
-    setTimerDurationMinutes(safeMinutes);
-    setSecondsRemaining(safeMinutes * 60);
-    setTimerRunning(true);
+  const startPlannedFocus = useCallback((sessionId: string, minutes: number) => {
+    const duration = safeDuration(minutes);
+    storeUpdateFocusSession({
+      endsAt: new Date(Date.now() + duration * 60_000).toISOString(),
+      pausedSeconds: null,
+      durationMinutes: duration,
+      sessionId,
+    });
     return true;
-  }
+  }, []);
 
-  function pauseTimer() { setTimerRunning(false); }
-  function resetTimer() {
-    setTimerRunning(false);
-    setActiveFocusSessionId(null);
-    setTimerDurationMinutes(focusMinutes);
-    setSecondsRemaining(focusMinutes * 60);
-  }
-  function clearFocusSession() { setActiveFocusSessionId(null); }
+  const pauseTimer = useCallback(() => {
+    storeUpdateFocusSession({
+      endsAt: null,
+      pausedSeconds: Math.max(0, secondsRemaining),
+      durationMinutes: focusSession.durationMinutes,
+      sessionId: focusSession.sessionId,
+    });
+  }, [secondsRemaining, focusSession]);
+
+  const resumeTimer = useCallback(() => {
+    const remaining = focusSession.pausedSeconds ?? secondsRemaining;
+    if (remaining <= 0) return;
+    storeUpdateFocusSession({
+      endsAt: new Date(Date.now() + remaining * 1000).toISOString(),
+      pausedSeconds: null,
+      durationMinutes: focusSession.durationMinutes,
+      sessionId: focusSession.sessionId,
+    });
+  }, [focusSession, secondsRemaining]);
+
+  const resetTimer = useCallback(() => {
+    storeUpdateFocusSession({ endsAt: null, pausedSeconds: null, durationMinutes: focusMinutes, sessionId: null });
+  }, [focusMinutes]);
+
+  const clearFocusSession = useCallback(() => {
+    storeUpdateFocusSession({ ...focusSession, sessionId: null });
+  }, [focusSession]);
+
+  const setFocusLength = useCallback((minutes: number) => {
+    const duration = safeDuration(minutes);
+    storeUpdateFocusMinutes(duration);
+    storeUpdateFocusSession({ endsAt: null, pausedSeconds: null, durationMinutes: duration, sessionId: null });
+  }, []);
 
   const value = useMemo<StudyContextValue>(() => ({
-    today, dates, ready, assignments, setAssignments, availability, setAvailability,
-    plan, setPlan, reminders, setReminders, focusMinutes, setFocusMinutes, setFocusLength, timerDurationMinutes,
-    secondsRemaining, setSecondsRemaining, timerRunning, setTimerRunning,
-    activeFocusSessionId, clearFocusSession, startTimer, startPlannedFocus, pauseTimer, resetTimer, toast, setToast,
-  }), [today, dates, ready, assignments, availability, plan, reminders, focusMinutes, timerDurationMinutes, secondsRemaining, timerRunning, activeFocusSessionId, toast]);
+    today: hydrated ? today : null,
+    dates,
+    ready: hydrated,
+    assignments,
+    setAssignments,
+    availability,
+    setAvailability,
+    plan,
+    setPlan,
+    reminders,
+    setReminders,
+    focusMinutes,
+    setFocusLength,
+    timerDurationMinutes: focusSession.durationMinutes,
+    secondsRemaining,
+    timerRunning,
+    activeFocusSessionId: focusSession.sessionId,
+    clearFocusSession,
+    startTimer,
+    startPlannedFocus,
+    pauseTimer,
+    resumeTimer,
+    resetTimer,
+    toast,
+    setToast,
+  }), [hydrated, today, dates, assignments, setAssignments, availability, setAvailability, plan, setPlan,
+    reminders, setReminders, focusMinutes, setFocusLength, focusSession, secondsRemaining, timerRunning,
+    clearFocusSession, startTimer, startPlannedFocus, pauseTimer, resumeTimer, resetTimer, toast, setToast]);
 
   return <StudyContext.Provider value={value}>{children}</StudyContext.Provider>;
 }

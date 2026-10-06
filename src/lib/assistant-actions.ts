@@ -8,6 +8,7 @@ import type {
 } from "@/lib/types";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 
 function isRealIsoDate(value: string): boolean {
   if (!ISO_DATE.test(value)) return false;
@@ -62,9 +63,13 @@ export function validateAssistantActions(
       case "set_availability":
         return knownAvailabilityDates.has(action.date) && Number.isInteger(action.minutes)
           && action.minutes >= 0 && action.minutes <= 720;
-      case "add_reminder":
-        return action.text.trim().length > 0 && action.text.trim().length <= 180
-          && (action.dueAt === null || (typeof action.dueAt === "string" && action.dueAt.length <= 40));
+      case "add_reminder": {
+        if (action.text.trim().length === 0 || action.text.trim().length > 180) return false;
+        if (action.dueAt === null) return true;
+        // Require a real ISO instant so stored reminders stay sortable.
+        if (typeof action.dueAt !== "string" || !ISO_INSTANT.test(action.dueAt)) return false;
+        return !Number.isNaN(Date.parse(action.dueAt));
+      }
       case "start_focus":
         return Number.isInteger(action.minutes) && action.minutes >= 1 && action.minutes <= 180;
       case "build_plan":
@@ -122,6 +127,7 @@ export function applyAssistantProposal(
   const addedReminders: Reminder[] = actions
     .filter((action): action is Extract<PendingAssistantAction, { type: "add_reminder" }> => action.type === "add_reminder")
     .map((action) => ({ id: createReminderId(), text: action.text, dueAt: action.dueAt, done: false }));
+  // dueAt is validated as an ISO instant, so it is stored as-is.
   const focus = actions.find((action): action is Extract<PendingAssistantAction, { type: "start_focus" }> => action.type === "start_focus");
 
   return {

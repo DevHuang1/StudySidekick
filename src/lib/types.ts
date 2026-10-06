@@ -69,10 +69,22 @@ export type Shortfall = {
   reason: "overdue" | "capacity";
 };
 
+/** A focus session restored from browser storage; see study-storage for the shape. */
+export type StoredFocusSession = {
+  /** ISO instant the running timer reaches zero. Non-null only while running. */
+  endsAt: string | null;
+  /** Seconds left on the clock while paused; null unless paused. */
+  pausedSeconds: number | null;
+  durationMinutes: number;
+  sessionId: string | null;
+};
+
 export type StoredStudyData = {
   assignments: Assignment[];
   availability: DailyAvailability[];
   plan: WeeklyPlan | null;
   reminders: Reminder[];
   focusMinutes: number;
+  /** Present since the focus timer became reload-safe; older records omit it. */
+  focusSession?: StoredFocusSession;
 };

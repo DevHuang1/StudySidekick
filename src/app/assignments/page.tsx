@@ -4,19 +4,9 @@ import { useState, type FormEvent } from "react";
 import { PageHeading } from "@/components/app-shell";
 import { useStudy } from "@/app/study-provider";
 import { addDays, formatDueDate } from "@/lib/date-utils";
+import { formatMinutes, newId } from "@/lib/format";
 import { remainingEffort } from "@/lib/progress";
 import type { Assignment } from "@/lib/types";
-
-function newId() {
-  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function formatMinutes(minutes: number) {
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return rest ? `${hours}h ${rest}m` : `${hours}h`;
-}
 
 export default function AssignmentsPage() {
   const { today, assignments, setAssignments, setPlan, setToast } = useStudy();
@@ -26,6 +16,9 @@ export default function AssignmentsPage() {
   const [course, setCourse] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [hours, setHours] = useState("2");
+
+  // Pages must not depend on AppShell's ready gate to satisfy their types.
+  if (!today) return null;
 
   function clearForm() {
     setEditingId(null);
@@ -86,7 +79,7 @@ export default function AssignmentsPage() {
         <form className="form-body" onSubmit={submitAssignment}>
           <div className="field full-field"><label htmlFor="assignment-title">Assignment title</label><input id="assignment-title" value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={100} placeholder="e.g. Research paper draft" /></div>
           <div className="field full-field"><label htmlFor="assignment-course">Course</label><input id="assignment-course" value={course} onChange={(event) => setCourse(event.target.value)} required maxLength={80} placeholder="e.g. Biology 101" /></div>
-          <div className="field-grid"><div className="field"><label htmlFor="assignment-due">Due date</label><input id="assignment-due" value={dueDate || addDays(today!, 3)} onChange={(event) => setDueDate(event.target.value)} type="date" required min={today!} /></div><div className="field"><label htmlFor="assignment-hours">Estimated total effort</label><input id="assignment-hours" value={hours} onChange={(event) => setHours(event.target.value)} type="number" required min="0.25" max="168" step="0.25" /></div></div>
+          <div className="field-grid"><div className="field"><label htmlFor="assignment-due">Due date</label><input id="assignment-due" value={dueDate || addDays(today, 3)} onChange={(event) => setDueDate(event.target.value)} type="date" required min={today} /></div><div className="field"><label htmlFor="assignment-hours">Estimated total effort</label><input id="assignment-hours" value={hours} onChange={(event) => setHours(event.target.value)} type="number" required min="0.25" max="168" step="0.25" /></div></div>
           {formError && <p className="form-error" role="alert">{formError}</p>}
           <button className="primary-button form-button" type="submit">{editingId ? "Save assignment" : "+ Add assignment"}</button>
           {editingId && <button className="quiet-button" type="button" onClick={clearForm}>Cancel edit</button>}
@@ -95,7 +88,7 @@ export default function AssignmentsPage() {
 
       <section className="panel assignments-list-panel" aria-labelledby="saved-assignments-heading">
         <div className="panel-header"><h2 className="panel-title" id="saved-assignments-heading">Saved assignments</h2></div>
-        {assignments.length ? <div className="assignment-list page-assignment-list">{assignments.slice().sort((a, b) => a.dueDate.localeCompare(b.dueDate)).map((assignment) => <div className="assignment-row" key={assignment.id}><div className="assignment-copy"><strong>{assignment.title}</strong><span>{assignment.course} · {formatDueDate(assignment.dueDate, today!)}</span><span>{formatMinutes(assignment.completedMinutes)} done of {formatMinutes(assignment.estimateMinutes)} · {formatMinutes(remainingEffort(assignment))} left</span></div><div className="inline-actions"><button className="quiet-button" type="button" onClick={() => editAssignment(assignment)} aria-label={`Edit ${assignment.title}`}>Edit</button><button className="icon-button" type="button" onClick={() => removeAssignment(assignment.id)} aria-label={`Remove ${assignment.title}`}>×</button></div></div>)}</div> : <div className="empty-list assignments-empty"><strong>Nothing on your list yet.</strong><span>Add one deadline to give your week a starting point.</span></div>}
+        {assignments.length ? <div className="assignment-list page-assignment-list">{assignments.slice().sort((a, b) => a.dueDate.localeCompare(b.dueDate)).map((assignment) => <div className="assignment-row" key={assignment.id}><div className="assignment-copy"><strong>{assignment.title}</strong><span>{assignment.course} · {formatDueDate(assignment.dueDate, today)}</span><span>{formatMinutes(assignment.completedMinutes)} done of {formatMinutes(assignment.estimateMinutes)} · {formatMinutes(remainingEffort(assignment))} left</span></div><div className="inline-actions"><button className="quiet-button" type="button" onClick={() => editAssignment(assignment)} aria-label={`Edit ${assignment.title}`}>Edit</button><button className="icon-button" type="button" onClick={() => removeAssignment(assignment.id)} aria-label={`Remove ${assignment.title}`}>×</button></div></div>)}</div> : <div className="empty-list assignments-empty"><strong>Nothing on your list yet.</strong><span>Add one deadline to give your week a starting point.</span></div>}
         <div className="panel-footnote">Changes apply to a saved week only after you review and use a replan.</div>
       </section>
     </div>

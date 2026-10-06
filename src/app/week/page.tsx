@@ -5,25 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PageHeading } from "@/components/app-shell";
 import { useStudy } from "@/app/study-provider";
-import { addDays, formatDate, formatDueDate } from "@/lib/date-utils";
+import { formatDate, formatDueDate } from "@/lib/date-utils";
+import { formatHours, formatMinutes } from "@/lib/format";
 import { applySessionCompletion } from "@/lib/progress";
 import { buildSchedule, completedSessionsForWeek, moveSession, planInputSignature } from "@/lib/scheduler";
 
 type PendingMove = { sessionId: string; date: string } | null;
 
-function formatMinutes(minutes: number) {
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return rest ? `${hours}h ${rest}m` : `${hours}h`;
-}
-
-function minuteLabel(minutes: number) {
-  const hours = minutes / 60;
-  return Number.isInteger(hours) ? `${hours}h` : `${hours.toFixed(1)}h`;
-}
-
-export default function HomePage() {
+export default function WeeklyPlanPage() {
   const { today, dates, assignments, setAssignments, availability, setAvailability, plan, setPlan, timerRunning, startPlannedFocus, setToast } = useStudy();
   const router = useRouter();
   const [pendingMove, setPendingMove] = useState<PendingMove>(null);
@@ -33,15 +22,16 @@ export default function HomePage() {
 
   const horizonEnd = dates.at(-1) ?? "";
   const capacitySignature = useMemo(() => planInputSignature(assignments, availability), [assignments, availability]);
-  const planIsStale = Boolean(plan && (plan.inputSignature !== capacitySignature || plan.weekStart !== today));
+  // The window rolls forward on its own, so only the planner inputs can make a
+  // saved plan stale; a date change is handled by the store, not by this flag.
+  const planIsStale = Boolean(plan && plan.inputSignature !== capacitySignature);
   const preservedCompletedSessions = useMemo(() => completedSessionsForWeek(plan?.sessions ?? [], assignments, dates), [plan, assignments, dates]);
   const schedulePreview = useMemo(() => today ? buildSchedule(assignments, availability, dates, today, preservedCompletedSessions) : { sessions: [], shortfalls: [], backlog: [] }, [assignments, availability, dates, today, preservedCompletedSessions]);
   const sessions = plan?.sessions.filter((session) => assignments.some((assignment) => assignment.id === session.assignmentId)) ?? [];
+  // Progress always describes the week on screen, never a superseded window.
   const visibleSessions = sessions.filter((session) => dates.includes(session.date));
-  const progressWeekDates = plan?.weekStart ? Array.from({ length: 7 }, (_, index) => addDays(plan.weekStart, index)) : [];
-  const progressSessions = sessions.filter((session) => progressWeekDates.includes(session.date));
-  const plannedMinutes = progressSessions.reduce((total, session) => total + session.minutes, 0);
-  const completedPlannedMinutes = progressSessions.filter((session) => session.completed).reduce((total, session) => total + session.minutes, 0);
+  const plannedMinutes = visibleSessions.reduce((total, session) => total + session.minutes, 0);
+  const completedPlannedMinutes = visibleSessions.filter((session) => session.completed).reduce((total, session) => total + session.minutes, 0);
   const progress = plannedMinutes ? Math.floor((completedPlannedMinutes / plannedMinutes) * 100) : 0;
   const totalAvailableMinutes = availability.reduce((total, day) => total + day.minutes, 0);
   const shortfallMinutes = schedulePreview.shortfalls.reduce((total, item) => total + item.minutes, 0);
@@ -116,15 +106,18 @@ export default function HomePage() {
   const goalHint = !plannedMinutes ? "Add your first assignment to begin." : progress >= 100 ? "Your planned study time is complete. Take the win." : nextSession ? `Next win: one ${formatMinutes(nextSession.minutes)} block brings you to ${nextStepProgress}%.` : "Your next study block will move the bar forward.";
   const progressPhase = progress >= 100 ? "complete" : progress >= 75 ? "near" : progress >= 50 ? "middle" : progress >= 25 ? "start" : "beginning";
 
+  // Pages should not lean on AppShell's ready gate to satisfy their types.
+  if (!today) return null;
+
   return <>
-    <PageHeading title="A week you can breathe through" description="Turn due dates into small, realistic study blocks. You choose the hours; your plan stays adjustable." aside={<div className="week-chip">{formatDate(today!, { month: "long", day: "numeric" })} — {formatDate(horizonEnd, { month: "long", day: "numeric" })}</div>} />
+    <PageHeading title="A week you can breathe through" description="Turn due dates into small, realistic study blocks. You choose the hours; your plan stays adjustable." aside={<div className="week-chip">{formatDate(today, { month: "long", day: "numeric" })} — {formatDate(horizonEnd, { month: "long", day: "numeric" })}</div>} />
 
     <div className="weekly-page">
     <section className="hero-card" aria-label="Weekly progress">
       <div className="hero-copy"><h2>{milestone}</h2><p>{plannedMinutes ? progress === 100 ? "That’s enough for today. Let yourself feel good about it." : "No need to do it all at once. Pick the next block that feels manageable." : "Add your assignments and available hours. We’ll shape them into a week that feels doable."}</p></div>
       <div className={`goal-progress phase-${progressPhase}`}>
         <div className="goal-progress-top"><div className="goal-percent">{progress}<span>%</span></div><div className="goal-copy"><b>Study progress</b><span>{goalHint}</span></div></div>
-        <div className="goal-track" role="progressbar" aria-label="Weekly study progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} aria-valuetext={`${formatMinutes(completedPlannedMinutes)} of ${formatMinutes(plannedMinutes)} planned study time complete`}><span className="goal-fill" style={{ width: `${progress}%` }} />{[25, 50, 75, 100].map((target) => <i className={progress >= target ? "goal-marker reached" : "goal-marker"} key={target} style={{ left: `${target}%` }} aria-hidden="true" />)}</div>
+        <div className="goal-track" role="progressbar" aria-label="Weekly study progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} aria-valuetext={`${formatMinutes(completedPlannedMinutes)} of ${formatMinutes(plannedMinutes)} planned study time complete`}><span className="goal-fill" style={{ width: `${progress}%` }} />{[25, 50, 75, 100].map((target) => <span className={progress >= target ? "goal-marker reached" : "goal-marker"} key={target} style={{ left: `${target}%` }} aria-hidden="true" />)}</div>
         <div className="goal-meta"><span>{formatMinutes(completedPlannedMinutes)} done</span><span>{formatMinutes(plannedMinutes)} planned</span></div>
       </div>
     </section>
@@ -160,21 +153,22 @@ export default function HomePage() {
         const pct = available ? Math.min(100, planned / available * 100) : planned > 0 ? 100 : 0;
         return <article className={`day-card${date === today ? " today" : ""}${planned > available ? " overbooked" : ""}`} key={date}>
           <div className="day-head"><div className="day-name"><strong>{index === 0 ? "Today" : formatDate(date, { weekday: "short" })}</strong><span>{formatDate(date, { month: "short", day: "numeric" })}</span></div></div>
-          <div className="load-bar" aria-label={`${formatMinutes(planned)} planned out of ${formatMinutes(available)} available`}><span style={{ width: `${pct}%` }} /></div>
+          {/* aria-label needs a role to be announced; the totals are repeated as text below. */}
+          <div className="load-bar" role="img" aria-label={`${formatMinutes(planned)} planned out of ${formatMinutes(available)} available`}><span style={{ width: `${pct}%` }} /></div>
           {daySessions.length ? <div className="session-list">{daySessions.map((session) => {
             const assignment = assignments.find((item) => item.id === session.assignmentId);
             if (!assignment) return null;
             const selectedMove = pendingMove?.sessionId === session.id ? pendingMove.date : "";
-            const moveOptions = dates.filter((candidate) => candidate >= today! && candidate <= assignment.dueDate && candidate !== session.date);
+            const moveOptions = dates.filter((candidate) => candidate >= today && candidate <= assignment.dueDate && candidate !== session.date);
             return <div className={`session-row${session.completed ? " session-done" : ""}`} key={session.id}><input className="session-check" type="checkbox" checked={session.completed} onChange={(event) => toggleSession(session.id, event.target.checked)} aria-label={`${session.completed ? "Mark incomplete" : "Complete"}: ${assignment.title}, ${formatMinutes(session.minutes)}`} /><div className="session-main"><span className="session-title">{assignment.title}</span><span className="session-course">{assignment.course}</span></div><span className="session-duration">{formatMinutes(session.minutes)}</span>{!session.completed && <><div className="move-control"><select id={`move-${session.id}`} className="move-select" value={selectedMove} onChange={(event) => { setMoveError(""); setPendingMove(event.target.value ? { sessionId: session.id, date: event.target.value } : null); }} aria-label={`Preview a new date for ${assignment.title}`}><option value="">Move to…</option>{moveOptions.map((candidate) => <option key={candidate} value={candidate}>{formatDate(candidate)}</option>)}</select></div><button className="session-focus-button" type="button" onClick={() => startFocus(session.id, session.minutes)}>{timerRunning ? "Open focus" : "Start focus"}</button></>}</div>;
           })}</div> : <div className="empty-day"><strong>{available ? "Open study time" : "A day off"}</strong>{available ? "No blocks scheduled yet." : "No hours set aside."}</div>}
-          <div className="day-available"><span>Planned <b>{formatMinutes(planned)}</b></span><span>Available <b>{minuteLabel(available)}</b></span></div>
+          <div className="day-available"><span>Planned <b>{formatMinutes(planned)}</b></span><span>Available <b>{formatHours(available)}</b></span></div>
         </article>;
       })}</div>
       <div className="panel-footnote">Larger assignments are split into short blocks (usually 25–60 minutes). Due dates come first; study blocks never exceed the daily hours you set.</div>
     </section>
 
-    {schedulePreview.backlog.length > 0 && <section className="panel subsection" aria-labelledby="backlog-heading"><div className="subsection-heading"><h3 id="backlog-heading">Coming up after this week</h3></div><div className="backlog-list">{schedulePreview.backlog.map((assignment) => <div className="backlog-row" key={assignment.id}><div className="backlog-copy"><strong>{assignment.title}</strong><span>{assignment.course} · {formatDueDate(assignment.dueDate, today!)}</span></div><span className="backlog-minutes">{formatMinutes(assignment.remainingMinutes)} left</span></div>)}</div></section>}
+    {schedulePreview.backlog.length > 0 && <section className="panel subsection" aria-labelledby="backlog-heading"><div className="subsection-heading"><h3 id="backlog-heading">Coming up after this week</h3></div><div className="backlog-list">{schedulePreview.backlog.map((assignment) => <div className="backlog-row" key={assignment.id}><div className="backlog-copy"><strong>{assignment.title}</strong><span>{assignment.course} · {formatDueDate(assignment.dueDate, today)}</span></div><span className="backlog-minutes">{formatMinutes(assignment.remainingMinutes)} left</span></div>)}</div></section>}
     </div>
   </>;
 }

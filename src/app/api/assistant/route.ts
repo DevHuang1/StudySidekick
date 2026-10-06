@@ -73,6 +73,24 @@ function validateOutput(
   };
 }
 
+/** A model can return prose around its JSON; tolerate that instead of throwing. */
+function parseModelJson(content: string): unknown {
+  const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const candidate = (fenced ? fenced[1] : content).trim();
+  try {
+    return JSON.parse(candidate);
+  } catch {
+    const start = candidate.indexOf("{");
+    const end = candidate.lastIndexOf("}");
+    if (start === -1 || end <= start) return null;
+    try {
+      return JSON.parse(candidate.slice(start, end + 1));
+    } catch {
+      return null;
+    }
+  }
+}
+
 function localOllamaUrl(): string | null {
   try {
     const url = new URL(process.env.OLLAMA_BASE_URL || "http://localhost:11434");
@@ -105,7 +123,7 @@ export async function POST(request: Request) {
   const fallback = validateOutput(guidedReply(input.data.message), input.data);
   const system = {
       role: "system" as const,
-      content: `You are Study Sidekick, a supportive student planning assistant. Current local date: ${input.data.today ?? new Date().toISOString().slice(0, 10)}. Be concise, warm, and honest. Suggest actions only when the user clearly requests them. Never claim actions have been saved or started; the app shows one preview of every proposed change and asks for confirmation. You may propose up to eight actions in order. Assignment estimateMinutes is total effort, while completedMinutes is already-finished planned effort; the scheduler derives the remaining effort and is authoritative. For new assignments, only propose add_assignment when title, course, due date in YYYY-MM-DD, and total estimated effort are all present; convert hours to integer minutes. Do not invent details, deadlines, or available study time. To edit a saved assignment, use its exact id from the study context and propose only fields the user asked to change. If the match is ambiguous or any required detail is missing, ask a clarification and do not propose that change. You may set_availability only for an exact date in the supplied seven-day availability, with a whole number of minutes from 0 to 720; do not modify days outside that range. For reminders, propose the exact reminder text and use dueAt null unless the user gave an unambiguous date/time. For focus timers, propose 1–180 minutes only when the duration is known. For requests to build a week plan, propose build_plan after any assignment or availability changes so the app previews the resulting schedule together. The scheduler, not you, decides study-session dates and capacity. Return only the requested schema.`,
+      content: `You are Study Sidekick, a supportive student planning assistant. Current local date: ${input.data.today ?? new Date().toISOString().slice(0, 10)}. Be concise, warm, and honest. Suggest actions only when the user clearly requests them. Never claim actions have been saved or started; the app shows one preview of every proposed change and asks for confirmation. You may propose up to eight actions in order. Assignment estimateMinutes is total effort, while completedMinutes is already-finished planned effort; the scheduler derives the remaining effort and is authoritative. For new assignments, only propose add_assignment when title, course, due date in YYYY-MM-DD, and total estimated effort are all present; convert hours to integer minutes. Do not invent details, deadlines, or available study time. To edit a saved assignment, use its exact id from the study context and propose only fields the user asked to change. If the match is ambiguous or any required detail is missing, ask a clarification and do not propose that change. You may set_availability only for an exact date in the supplied seven-day availability, with a whole number of minutes from 0 to 720; do not modify days outside that range. For reminders, propose the exact reminder text and set dueAt to an ISO 8601 instant with a timezone, for example 2026-10-06T09:30:00.000Z, or null when the user gave no unambiguous date/time. For focus timers, propose 1–180 minutes only when the duration is known. For requests to build a week plan, propose build_plan after any assignment or availability changes so the app previews the resulting schedule together. The scheduler, not you, decides study-session dates and capacity. Return only the requested schema.`,
   };
   const messages = [
     system,
@@ -159,7 +177,7 @@ export async function POST(request: Request) {
       const result: unknown = await response.json();
       const content = (result as { choices?: Array<{ message?: { content?: unknown } }> }).choices?.[0]?.message?.content;
       if (typeof content !== "string") return NextResponse.json({ error: "Groq returned an unexpected response. Please retry or choose another provider." }, { status: 502 });
-      const parsed = assistantOutputSchema.safeParse(JSON.parse(content));
+      const parsed = assistantOutputSchema.safeParse(parseModelJson(content));
       if (!parsed.success) return NextResponse.json({ error: "Groq’s reply did not match the action format. Please retry." }, { status: 502 });
       return NextResponse.json({ ...validateOutput(parsed.data, input.data), provider: "groq" });
     } catch {
@@ -190,7 +208,7 @@ export async function POST(request: Request) {
     const result: unknown = await response.json();
     const content = (result as { message?: { content?: unknown } }).message?.content;
     if (typeof content !== "string") return NextResponse.json({ ...fallback, provider: "guided" });
-    const parsed = assistantOutputSchema.safeParse(JSON.parse(content));
+    const parsed = assistantOutputSchema.safeParse(parseModelJson(content));
     if (!parsed.success) return NextResponse.json({ ...fallback, provider: "guided" });
     return NextResponse.json({ ...validateOutput(parsed.data, input.data), provider: "ollama" });
   } catch {

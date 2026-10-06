@@ -8,6 +8,7 @@ import { assistantReplySchema } from "@/lib/assistant-schema";
 import { applyAssistantProposal, applyAssistantStudyChanges, validateAssistantActions } from "@/lib/assistant-actions";
 import { formatDate, formatDueDate } from "@/lib/date-utils";
 import { buildDemoRequest } from "@/lib/demo-prompt";
+import { formatInstant, formatMinutes, newId } from "@/lib/format";
 import { buildSchedule, completedSessionsForWeek, planInputSignature } from "@/lib/scheduler";
 import type { AssistantProvider, AssistantProviderChoice, AssistantStudyContext, Assignment, PendingAssistantAction } from "@/lib/types";
 
@@ -20,17 +21,6 @@ type PendingProposal = {
   planPreview: SchedulePreview | null;
 };
 type PendingGroqRequest = { message: string };
-
-function newId() {
-  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function formatMinutes(minutes: number) {
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return rest ? `${hours}h ${rest}m` : `${hours}h`;
-}
 
 function toStudyContext(assignments: Assignment[], availability: AssistantStudyContext["availability"]): AssistantStudyContext {
   return {
@@ -60,8 +50,10 @@ function describeAction(action: PendingAssistantAction, today: string, assignmen
       const before = availability.find((day) => day.date === action.date)?.minutes ?? 0;
       return <>Set study time for {formatDate(action.date)} · {formatMinutes(before)} → {formatMinutes(action.minutes)}</>;
     }
-    case "add_reminder":
-      return <>Save reminder: <strong>{action.text}</strong>{action.dueAt ? ` · ${action.dueAt}` : ""}</>;
+case "add_reminder": {
+        const when = formatInstant(action.dueAt);
+        return <>Save reminder: <strong>{action.text}</strong>{when ? ` · ${when}` : ""}</>;
+      }
     case "start_focus":
       return <>Start a {action.minutes}-minute focus timer</>;
     case "build_plan":
@@ -230,16 +222,25 @@ export default function SidekickPage() {
   }
   const assignmentsById = new Map(proposal?.assignmentsAfter.map((assignment) => [assignment.id, assignment]) ?? []);
 
+  // Pages must not depend on AppShell's ready gate to satisfy their types.
+  if (!today) return null;
+
   return <>
     <PageHeading title="Let Sidekick handle it" description="Tell Sidekick what you need. Review the full handoff before anything changes." />
     <div className="sidekick-layout">
       <section className="panel sidekick-panel" aria-label="Sidekick assistant">
         <div className="sidekick-bar"><span className="sidekick-status-dot" aria-hidden="true" /><span>{providerLabel}</span><label className="sidekick-provider-label" htmlFor="assistant-provider">Use</label><select id="assistant-provider" className="sidekick-provider" value={providerChoice} onChange={(event) => { setProviderChoice(event.target.value as AssistantProviderChoice); setProvider(null); setError(""); }} disabled={sending || Boolean(proposal) || Boolean(pendingGroq)}><option value="auto">Local / guided</option><option value="ollama">Ollama · local</option><option value="groq">Groq · cloud</option></select><span className="sidekick-approval">Nothing is saved until you approve it.</span></div>
 
-        <div className="sidekick-chat" aria-live="polite">
+        {/* The log itself is not a live region: announcing the whole transcript on every
+            turn would re-read the entire conversation. Only the newest turn and the
+            thinking indicator announce themselves. */}
+        <div className="sidekick-chat">
           {!messages.length && <div className="sidekick-welcome"><h2>What would you like off your plate?</h2><p>One request can add an assignment, adjust your study time, shape the week, save a reminder, and start a focus session.</p></div>}
-          {messages.map((message) => <div className={`chat-message ${message.role}`} key={message.id}><span className="chat-speaker">{message.role === "user" ? "You" : "Sidekick"}</span><p>{message.content}</p></div>)}
-          {sending && <div className="chat-message assistant"><span className="chat-speaker">Sidekick</span><p className="thinking-copy">Putting the pieces together…</p></div>}
+          {messages.map((message, index) => {
+            const isNewest = index === messages.length - 1;
+            return <div className={`chat-message ${message.role}`} key={message.id} aria-live={isNewest ? "polite" : "off"}><span className="chat-speaker">{message.role === "user" ? "You" : "Sidekick"}</span><p>{message.content}</p></div>;
+          })}
+          {sending && <div className="chat-message assistant" aria-live="polite"><span className="chat-speaker">Sidekick</span><p className="thinking-copy">Putting the pieces together…</p></div>}
         </div>
 
         {pendingGroq && <section className="groq-consent" aria-labelledby="groq-consent-heading" role="dialog" aria-modal="true">

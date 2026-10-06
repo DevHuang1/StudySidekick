@@ -5,6 +5,7 @@ export function localDateKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+/** Midday avoids DST shifts moving a date key onto a neighbouring day. */
 export function dateFromKey(key: string): Date {
   return new Date(`${key}T12:00:00`);
 }
@@ -20,6 +21,14 @@ export function getWeekDates(today = new Date()): string[] {
   return Array.from({ length: 7 }, (_, index) => addDays(first, index));
 }
 
+export function formatWeekday(key: string): string {
+  return new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(dateFromKey(key));
+}
+
+export function formatShortDate(key: string): string {
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(dateFromKey(key));
+}
+
 export function formatDate(key: string, options?: Intl.DateTimeFormatOptions): string {
   return new Intl.DateTimeFormat(undefined, options ?? { weekday: "short", month: "short", day: "numeric" }).format(dateFromKey(key));
 }
@@ -27,5 +36,5 @@ export function formatDate(key: string, options?: Intl.DateTimeFormatOptions): s
 export function formatDueDate(key: string, today: string): string {
   if (key === today) return "Due today";
   if (key === addDays(today, 1)) return "Due tomorrow";
-  return `Due ${formatDate(key, { month: "short", day: "numeric" })}`;
+  return `Due ${formatShortDate(key)}`;
 }

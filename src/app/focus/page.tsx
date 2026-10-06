@@ -4,23 +4,24 @@ import { useMemo, useState } from "react";
 import { PageHeading } from "@/components/app-shell";
 import { useStudy } from "@/app/study-provider";
 import { formatDate } from "@/lib/date-utils";
+import { formatMinutes } from "@/lib/format";
 import { completePlannedSession } from "@/lib/progress";
 
-function formatMinutes(minutes: number) {
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return rest ? `${hours}h ${rest}m` : `${hours}h`;
-}
+const PRESET_FOCUS_LENGTHS = [15, 25, 30, 45, 60];
 
 export default function FocusPage() {
   const {
     dates, assignments, setAssignments, plan, setPlan,
     focusMinutes, setFocusLength, timerDurationMinutes, secondsRemaining,
-    timerRunning, setTimerRunning, activeFocusSessionId, clearFocusSession,
-    startTimer, startPlannedFocus, pauseTimer, resetTimer, setToast,
+    timerRunning, activeFocusSessionId, clearFocusSession,
+    startTimer, startPlannedFocus, pauseTimer, resumeTimer, resetTimer, setToast,
   } = useStudy();
   const [selectedSessionId, setSelectedSessionId] = useState("");
+
+  // A stored preference outside the presets still needs a matching option to display.
+  const focusLengthOptions = PRESET_FOCUS_LENGTHS.includes(focusMinutes)
+    ? PRESET_FOCUS_LENGTHS
+    : [...PRESET_FOCUS_LENGTHS, focusMinutes].sort((left, right) => left - right);
 
   const focusableSessions = useMemo(() => (plan?.sessions ?? [])
     .filter((session) => !session.completed
@@ -46,7 +47,7 @@ export default function FocusPage() {
       return;
     }
     if (paused) {
-      setTimerRunning(true);
+      resumeTimer();
       return;
     }
     if (activeFocusSessionId && secondsRemaining === 0) return;
@@ -123,7 +124,7 @@ export default function FocusPage() {
         </select></div>
         {activeFocusSessionId || selectedSession
           ? <div className="focus-duration-note"><span>Planned block length</span><strong>{formatMinutes(activeFocusSessionId ? timerDurationMinutes : (selectedSession?.minutes ?? 0))}</strong></div>
-          : <div className="field focus-duration"><label htmlFor="focus-duration">Focus length</label><select id="focus-duration" value={focusMinutes} disabled={timerRunning} onChange={(event) => setFocusLength(Number(event.target.value))}><option value={15}>15 minutes</option><option value={25}>25 minutes</option><option value={30}>30 minutes</option><option value={45}>45 minutes</option><option value={60}>60 minutes</option></select></div>}
+          : <div className="field focus-duration"><label htmlFor="focus-duration">Focus length</label><select id="focus-duration" value={focusMinutes} disabled={timerRunning} onChange={(event) => setFocusLength(Number(event.target.value))}>{focusLengthOptions.map((minutes) => <option key={minutes} value={minutes}>{minutes} minutes</option>)}</select></div>}
       </section>
     </div>
   </>;

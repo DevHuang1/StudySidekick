@@ -27,6 +27,20 @@ describe("assistant study actions", () => {
     expect(result.rejectedCount).toBe(3);
   });
 
+  it("accepts only ISO instants for reminder due times", () => {
+    const actions = [
+      { type: "add_reminder", text: "Review the lab brief", dueAt: "2026-10-07T09:30:00.000Z" },
+      { type: "add_reminder", text: "No time given", dueAt: null },
+      { type: "add_reminder", text: "Vague time", dueAt: "tomorrow morning" },
+      { type: "add_reminder", text: "Bare date", dueAt: "2026-10-07" },
+    ] as AssistantAction[];
+
+    const result = validateAssistantActions(actions, context, today);
+
+    expect(result.actions).toEqual([actions[0], actions[1]]);
+    expect(result.rejectedCount).toBe(2);
+  });
+
   it("limits availability changes to the supplied week and 0–720 minutes", () => {
     const actions: AssistantAction[] = [
       { type: "set_availability", date: dates[2], minutes: 90 },

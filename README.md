@@ -19,7 +19,9 @@ Open <http://localhost:3000>. No account, API key, AWS account, paid API, or phy
 
 Add or edit assignment details on the **Assignments** page. Estimates are total effort; completed planned time is tracked separately and the app shows what remains. Set your focus length and start a countdown on **Focus timer**; it continues while you navigate to another page. Keep a browser-only checklist on **Reminders**. Reminders do not send operating-system notifications.
 
-Assignments, availability, plans, completion state, reminders, and focus-length preference stay in this browser's local storage. Clearing browser storage removes that data. There is no account, sync, hosted database, or cloud hosting.
+Assignments, availability, plans, completion state, reminders, focus-length preference, and any in-progress focus timer stay in this browser's local storage. Clearing browser storage removes that data. There is no account, sync, hosted database, or cloud hosting.
+
+A running focus timer is stored as a wall-clock deadline rather than a countdown, so closing or reloading the tab does not lose the session; reopening the page shows the true time remaining. The seven-day window rolls forward on its own when the date changes, and assignment-level completion credit carries across the rollover. Reminder due times are stored as ISO 8601 instants so they stay sortable, and older records saved as display strings are migrated on load.
 
 The light/dark appearance follows your device preference until you choose a mode. A manual choice is saved in this browser.
 
@@ -31,7 +33,7 @@ The light/dark appearance follows your device preference until you choose a mode
 4. If work cannot fit before its due date, the planner shows the remaining time and possible trade-offs. Later deadlines appear in the backlog.
 5. Check off completed blocks, or choose a new day and confirm the move. Moves past a due date or beyond a day's capacity are rejected. Checked time updates the assignment's done/total/left figures.
 
-Progress is completed planned minutes divided by the active seven-day plan. Assignment-level done/total/left figures persist across plan rebuilds and week rollovers. Assignments and availability edits do not silently rewrite a saved plan; choose **Review replan** to preview the remaining schedule and any deadline shortfall, then **Use this week** to apply it or **Keep current plan** to discard the preview. Checked blocks in the active seven-day window remain checked and reserve their time; unfinished placements are regenerated within the updated capacity.
+Progress is completed planned minutes divided by the seven-day plan on screen. Assignment-level done/total/left figures persist across plan rebuilds and week rollovers. Assignments and availability edits do not silently rewrite a saved plan; choose **Review replan** to preview the remaining schedule and any deadline shortfall, then **Use this week** to apply it or **Keep current plan** to discard the preview. Checked blocks in the active seven-day window remain checked and reserve their time; unfinished placements are regenerated within the updated capacity.
 
 ## Let Sidekick handle a request
 
@@ -71,10 +73,13 @@ The hackathon requires a repository link and a public video under three minutes 
 ## Development checks
 
 ```sh
+npm run lint
 npm run typecheck
 npm test
 npm run build
 ```
+
+`npm run lint` uses the ESLint CLI with the Next.js flat config (`eslint.config.mjs`); `next lint` was removed in Next.js 16. `npm test` runs Vitest, configured in `vitest.config.mts`.
 
 ## License
 

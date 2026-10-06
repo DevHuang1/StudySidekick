@@ -13,7 +13,12 @@ const actionSchema = z.discriminatedUnion("type", [
     }).partial().strict().refine((changes) => Object.keys(changes).length > 0, "Provide at least one field to update."),
   }).strict(),
   z.object({ type: z.literal("set_availability"), date: z.iso.date(), minutes: z.number().int().min(0).max(720) }).strict(),
-  z.object({ type: z.literal("add_reminder"), text: z.string().trim().min(1).max(180), dueAt: z.string().max(40).nullable() }).strict(),
+  z.object({
+    type: z.literal("add_reminder"),
+    text: z.string().trim().min(1).max(180),
+    // ISO 8601 keeps reminders sortable; null means no time was requested.
+    dueAt: z.iso.datetime({ offset: true }).nullable(),
+  }).strict(),
   z.object({ type: z.literal("start_focus"), minutes: z.number().int().min(1).max(180) }).strict(),
   z.object({ type: z.literal("build_plan") }).strict(),
 ]);

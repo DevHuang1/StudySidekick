@@ -1,40 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-type Theme = "light" | "dark";
-const storageKey = "study-sidekick-theme";
-
-function setDocumentTheme(theme: Theme) {
-  document.documentElement.dataset.theme = theme;
-}
+import { useEffect, useSyncExternalStore } from "react";
+import {
+  applyTheme,
+  getServerTheme,
+  getTheme,
+  paintTheme,
+  subscribeToTheme,
+} from "@/lib/theme";
 
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>("light");
+  const theme = useSyncExternalStore(subscribeToTheme, getTheme, getServerTheme);
 
+  // Paint the resolved theme after hydration: the attribute cannot be set from
+  // the server-rendered markup without guessing the reader's OS setting.
   useEffect(() => {
-    let initial: Theme = "light";
-    try {
-      const saved = window.localStorage.getItem(storageKey);
-      initial = saved === "light" || saved === "dark"
-        ? saved
-        : window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    } catch {
-      initial = window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    }
-    setDocumentTheme(initial);
-    setTheme(initial);
-  }, []);
+    paintTheme(theme);
+  }, [theme]);
 
   function toggleTheme() {
-    const next: Theme = theme === "dark" ? "light" : "dark";
-    setDocumentTheme(next);
-    setTheme(next);
-    try {
-      window.localStorage.setItem(storageKey, next);
-    } catch {
-      // Keep the current page usable if browser storage is unavailable.
-    }
+    applyTheme(theme === "dark" ? "light" : "dark");
   }
 
   const nextTheme = theme === "dark" ? "light" : "dark";
