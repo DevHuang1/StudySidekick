@@ -90,11 +90,23 @@ export function StudyProvider({ children }: { children: ReactNode }) {
   // Adopt writes made by other open tabs.
   useEffect(() => attachCrossTabSync(), []);
 
-  // Roll the seven-day window forward when the calendar date changes.
+  // Roll the seven-day window forward when the calendar date changes, even when
+  // a tab stays open past midnight.
   useEffect(() => {
     if (!hydrated) return;
-    const currentDate = localDateKey(new Date());
-    if (currentDate !== today) syncToday(currentDate);
+    const checkDate = () => {
+      const currentDate = localDateKey(new Date());
+      if (currentDate !== today) syncToday(currentDate);
+    };
+    checkDate();
+    const interval = window.setInterval(checkDate, 60_000);
+    window.addEventListener("visibilitychange", checkDate);
+    window.addEventListener("focus", checkDate);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("visibilitychange", checkDate);
+      window.removeEventListener("focus", checkDate);
+    };
   }, [hydrated, today]);
 
   // Stop the clock at zero and report completion once per run.

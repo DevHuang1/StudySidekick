@@ -32,7 +32,8 @@ function setClock(next: number) {
 }
 
 function syncClockTimer() {
-  const shouldRun = currentSnapshot().focusSession.endsAt !== null;
+  // Keep the interval alive only while a session runs and someone is listening.
+  const shouldRun = clockListeners.size > 0 && currentSnapshot().focusSession.endsAt !== null;
   if (shouldRun && clockTimer === null) {
     clockTimer = window.setInterval(() => setClock(Date.now()), 1000);
   } else if (!shouldRun && clockTimer !== null) {

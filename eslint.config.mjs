@@ -10,5 +10,6 @@ export default defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "video/**",
   ]),
 ]);

@@ -14,8 +14,12 @@ export default function AssignmentsPage() {
   const [formError, setFormError] = useState("");
   const [title, setTitle] = useState("");
   const [course, setCourse] = useState("");
-  const [dueDate, setDueDate] = useState("");
+  const [dueDateOverride, setDueDateOverride] = useState<string | null>(null);
   const [hours, setHours] = useState("2");
+
+  // Suggest a nearby default date, while an explicit empty value (cleared by
+  // the reader) stays empty so the field can be retyped.
+  const dueDate = dueDateOverride ?? (today ? addDays(today, 3) : "");
 
   // Pages must not depend on AppShell's ready gate to satisfy their types.
   if (!today) return null;
@@ -25,7 +29,7 @@ export default function AssignmentsPage() {
     setFormError("");
     setTitle("");
     setCourse("");
-    setDueDate("");
+    setDueDateOverride(null);
     setHours("2");
   }
 
@@ -55,7 +59,7 @@ export default function AssignmentsPage() {
     setEditingId(assignment.id);
     setTitle(assignment.title);
     setCourse(assignment.course);
-    setDueDate(assignment.dueDate);
+    setDueDateOverride(assignment.dueDate);
     setHours(String(Number((assignment.estimateMinutes / 60).toFixed(2))));
     setFormError("");
     document.getElementById("assignment-title")?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -79,7 +83,7 @@ export default function AssignmentsPage() {
         <form className="form-body" onSubmit={submitAssignment}>
           <div className="field full-field"><label htmlFor="assignment-title">Assignment title</label><input id="assignment-title" value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={100} placeholder="e.g. Research paper draft" /></div>
           <div className="field full-field"><label htmlFor="assignment-course">Course</label><input id="assignment-course" value={course} onChange={(event) => setCourse(event.target.value)} required maxLength={80} placeholder="e.g. Biology 101" /></div>
-          <div className="field-grid"><div className="field"><label htmlFor="assignment-due">Due date</label><input id="assignment-due" value={dueDate || addDays(today, 3)} onChange={(event) => setDueDate(event.target.value)} type="date" required min={today} /></div><div className="field"><label htmlFor="assignment-hours">Estimated total effort</label><input id="assignment-hours" value={hours} onChange={(event) => setHours(event.target.value)} type="number" required min="0.25" max="168" step="0.25" /></div></div>
+          <div className="field-grid"><div className="field"><label htmlFor="assignment-due">Due date</label><input id="assignment-due" value={dueDate} onChange={(event) => setDueDateOverride(event.target.value)} type="date" required min={today} /></div><div className="field"><label htmlFor="assignment-hours">Estimated total effort</label><input id="assignment-hours" value={hours} onChange={(event) => setHours(event.target.value)} type="number" required min="0.25" max="168" step="0.25" /></div></div>
           {formError && <p className="form-error" role="alert">{formError}</p>}
           <button className="primary-button form-button" type="submit">{editingId ? "Save assignment" : "+ Add assignment"}</button>
           {editingId && <button className="quiet-button" type="button" onClick={clearForm}>Cancel edit</button>}

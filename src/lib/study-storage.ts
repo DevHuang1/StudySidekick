@@ -39,9 +39,13 @@ function defaultAvailability(dates: string[]): DailyAvailability[] {
   return dates.map((date) => ({ date, minutes: 120 }));
 }
 
-function readFocusSession(value: unknown): StoredFocusSession {
-  const candidate = value && typeof value === "object" ? value as Partial<StoredFocusSession> : {};
-  const durationMinutes = clampMinutes(candidate.durationMinutes, 25, 180) || 25;
+function readFocusSession(value: unknown): StoredFocusSession | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<StoredFocusSession>;
+  // A session without a usable duration is treated as absent, so the saved
+  // preference applies. An explicit 25-minute session is kept exactly.
+  const durationMinutes = clampMinutes(candidate.durationMinutes, 0, 180);
+  if (durationMinutes <= 0) return null;
   const endsAt = typeof candidate.endsAt === "string" && !Number.isNaN(Date.parse(candidate.endsAt))
     ? candidate.endsAt
     : null;
@@ -57,6 +61,17 @@ function readFocusSession(value: unknown): StoredFocusSession {
   };
 }
 
+/**
+ * Older records saved a locale display string instead of an ISO instant;
+ * convert what can be parsed so due times stay sortable.
+ */
+function migrateDueAt(value: unknown): string | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  if (/^\d{4}-\d{2}-\d{2}T/.test(value.trim())) return value;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : new Date(parsed).toISOString();
+}
+
 function parseReminders(value: unknown): Reminder[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item) => item && typeof item === "object")
@@ -66,7 +81,7 @@ function parseReminders(value: unknown): Reminder[] {
       return {
         id: typeof reminder.id === "string" && reminder.id ? reminder.id : newId(),
         text: reminder.text,
-        dueAt: typeof reminder.dueAt === "string" && reminder.dueAt ? reminder.dueAt : null,
+        dueAt: migrateDueAt(reminder.dueAt),
         done: Boolean(reminder.done),
       };
     })
@@ -120,7 +135,10 @@ export function parseStoredStudyData(raw: string | null, dates: string[], today:
     : [];
 
   const focusMinutes = clampMinutes(saved.focusMinutes, 25, 180) || 25;
-  const focusSession = readFocusSession(saved.focusSession);
+  // Fall back to the saved preference only when no usable session was stored,
+  // so a real 25-minute session is never rewritten to the default length.
+  const focusSession = readFocusSession(saved.focusSession)
+    ?? { endsAt: null, pausedSeconds: null, durationMinutes: focusMinutes, sessionId: null };
 
   return {
     assignments: normalizeAssignmentProgress(savedAssignments, savedPlan?.sessions ?? []),
@@ -131,11 +149,7 @@ export function parseStoredStudyData(raw: string | null, dates: string[], today:
     plan: savedPlan,
     reminders: parseReminders(saved.reminders),
     focusMinutes,
-    // Fall back to the saved preference so an older record without a focus
-    // session still opens on the length the user last chose.
-    focusSession: focusSession.durationMinutes === 25
-      ? { ...focusSession, durationMinutes: focusMinutes }
-      : focusSession,
+    focusSession,
   };
 }
 
@@ -151,7 +165,7 @@ export function parseLegacyReminders(raw: string | null): Reminder[] {
       return [{
         id: typeof legacy.id === "string" && legacy.id ? legacy.id : newId(),
         text: legacy.text,
-        dueAt: typeof legacy.due === "string" && legacy.due ? legacy.due : null,
+        dueAt: migrateDueAt(legacy.due),
         done: Boolean(legacy.done),
       }];
     });

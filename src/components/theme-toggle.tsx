@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useSyncExternalStore } from "react";
+import { useLayoutEffect, useSyncExternalStore } from "react";
 import {
   applyTheme,
   getServerTheme,
@@ -12,9 +12,9 @@ import {
 export function ThemeToggle() {
   const theme = useSyncExternalStore(subscribeToTheme, getTheme, getServerTheme);
 
-  // Paint the resolved theme after hydration: the attribute cannot be set from
-  // the server-rendered markup without guessing the reader's OS setting.
-  useEffect(() => {
+  // Repaint the resolved theme before paint; this also re-applies the value
+  // that React's development Strict Mode remount clears from <html>.
+  useLayoutEffect(() => {
     paintTheme(theme);
   }, [theme]);
 

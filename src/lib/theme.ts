@@ -2,6 +2,12 @@ export type Theme = "light" | "dark";
 
 const storageKey = "study-sidekick-theme";
 
+/**
+ * Injected before hydration so the saved theme paints on the first frame.
+ * Keep this dependency-free and in sync with getTheme().
+ */
+export const themeInitScript = `(function(){try{var t=localStorage.getItem(${JSON.stringify(storageKey)});var d=t==="light"||t==="dark"?t:(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");document.documentElement.dataset.theme=d}catch(e){}})();`;
+
 const listeners = new Set<() => void>();
 
 /** localStorage is unavailable in private modes and some embedded webviews. */

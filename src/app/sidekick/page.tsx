@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { PageHeading } from "@/components/app-shell";
 import { useStudy } from "@/app/study-provider";
 import { assistantReplySchema } from "@/lib/assistant-schema";
@@ -75,6 +75,37 @@ export default function SidekickPage() {
   const [provider, setProvider] = useState<AssistantProvider | null>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const groqDialogRef = useRef<HTMLElement>(null);
+
+  // Move focus into the consent dialog, support Escape, and restore focus on close.
+  useEffect(() => {
+    if (!pendingGroq) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    groqDialogRef.current?.querySelector<HTMLElement>("button")?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setPendingGroq(null);
+        return;
+      }
+      if (event.key !== "Tab" || !groqDialogRef.current) return;
+      const focusable = groqDialogRef.current.querySelectorAll<HTMLElement>("button, input");
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      previous?.focus();
+    };
+  }, [pendingGroq]);
 
   async function requestMessage(message: string, groqConfirmed = false, includeSavedContext = false) {
     if (!today || !ready || sending || proposal || (pendingGroq && !groqConfirmed)) return;
@@ -98,7 +129,13 @@ export default function SidekickPage() {
           ...(providerChoice === "groq" ? { groqConsent: groqConfirmed, includeStudyContext: includeSavedContext } : {}),
         }),
       });
-      const raw: unknown = await response.json();
+      const bodyText = await response.text();
+      let raw: unknown = null;
+      try {
+        raw = bodyText ? JSON.parse(bodyText) : null;
+      } catch {
+        raw = null;
+      }
       if (!response.ok) {
         const messageFromServer = raw && typeof raw === "object" && "error" in raw && typeof raw.error === "string"
           ? raw.error
@@ -243,7 +280,7 @@ export default function SidekickPage() {
           {sending && <div className="chat-message assistant" aria-live="polite"><span className="chat-speaker">Sidekick</span><p className="thinking-copy">Putting the pieces together…</p></div>}
         </div>
 
-        {pendingGroq && <section className="groq-consent" aria-labelledby="groq-consent-heading" role="dialog" aria-modal="true">
+        {pendingGroq && <section className="groq-consent" ref={groqDialogRef} aria-labelledby="groq-consent-heading" role="dialog" aria-modal="true">
           <h2 id="groq-consent-heading">Before this goes to Groq</h2>
           <p>Your prompt, current date, and up to 10 recent chat messages will be sent to Groq Cloud for this request. You can cancel without sending anything.</p>
           <label className="groq-consent-option"><input type="checkbox" checked={includeStudyContext} onChange={(event) => setIncludeStudyContext(event.target.checked)} /><span><strong>Also include saved assignments and study hours</strong><span>This may help Sidekick edit tasks or build a more useful plan. Leave unchecked to keep study data out of Groq.</span></span></label>

@@ -146,18 +146,51 @@ describe("parseStoredStudyData", () => {
   });
 
   it("rejects an unparseable deadline and a stale deadline beside a pause", () => {
-    const bad = parseStoredStudyData(JSON.stringify({ focusSession: { endsAt: "soon", pausedSeconds: 120 } }), dates, today);
+    const bad = parseStoredStudyData(JSON.stringify({ focusSession: { endsAt: "soon", pausedSeconds: 120, durationMinutes: 45 } }), dates, today);
     expect(bad.focusSession.endsAt).toBeNull();
     expect(bad.focusSession.pausedSeconds).toBe(120);
 
     // A running deadline wins, so a leftover pause value cannot resurrect the timer.
-    const both = parseStoredStudyData(JSON.stringify({ focusSession: { endsAt: "2026-10-06T09:30:00.000Z", pausedSeconds: 900 } }), dates, today);
+    const both = parseStoredStudyData(JSON.stringify({ focusSession: { endsAt: "2026-10-06T09:30:00.000Z", pausedSeconds: 900, durationMinutes: 45 } }), dates, today);
+    expect(both.focusSession.endsAt).toBe("2026-10-06T09:30:00.000Z");
     expect(both.focusSession.pausedSeconds).toBeNull();
   });
 
   it("falls back to the saved preference when no focus session was stored", () => {
     const raw = JSON.stringify({ focusMinutes: 45 });
     expect(parseStoredStudyData(raw, dates, today).focusSession.durationMinutes).toBe(45);
+  });
+
+  it("keeps an explicit 25-minute session instead of rewriting it to the saved preference", () => {
+    const raw = JSON.stringify({
+      focusMinutes: 45,
+      focusSession: { endsAt: null, pausedSeconds: null, durationMinutes: 25, sessionId: "block-1" },
+    });
+    const parsed = parseStoredStudyData(raw, dates, today);
+
+    expect(parsed.focusSession.durationMinutes).toBe(25);
+    expect(parsed.focusSession.sessionId).toBe("block-1");
+  });
+
+  it("ignores a malformed focus session and keeps the saved preference", () => {
+    for (const focusSession of ["nonsense", { endsAt: null }, 42, { durationMinutes: 0 }]) {
+      const parsed = parseStoredStudyData(JSON.stringify({ focusMinutes: 45, focusSession }), dates, today);
+      expect(parsed.focusSession.durationMinutes).toBe(45);
+    }
+  });
+
+  it("migrates a legacy display-string reminder time to an ISO instant", () => {
+    const legacy = "10/6/2026, 3:30:00 PM";
+    const raw = JSON.stringify({ reminders: [{ id: "r1", text: "Legacy", dueAt: legacy, done: false }] });
+    const parsed = parseStoredStudyData(raw, dates, today);
+
+    expect(parsed.reminders[0].dueAt).toBe(new Date(legacy).toISOString());
+    expect(parsed.reminders[0].dueAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it("drops an unparseable reminder time instead of sorting it as text", () => {
+    const raw = JSON.stringify({ reminders: [{ id: "r1", text: "Broken", dueAt: "sometime soon", done: false }] });
+    expect(parseStoredStudyData(raw, dates, today).reminders[0].dueAt).toBeNull();
   });
 });
 

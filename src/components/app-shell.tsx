@@ -14,11 +14,13 @@ const pages = [
   { href: "/reminders", label: "Reminders", icon: "♧" },
 ];
 
+const standalonePages = new Set(["/", "/privacy", "/terms"]);
+
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { ready, toast } = useStudy();
 
-  if (pathname === "/") return <>{children}</>;
+  if (standalonePages.has(pathname)) return <>{children}</>;
 
   return (
     <div className="app-shell min-h-screen">
@@ -33,7 +35,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main className="main-area">
         <div className="content-wrap">
           {ready ? children : <div className="loading-shell"><span><i className="loading-dot" />Opening your private study space…</span></div>}
-          <p className="privacy-note">Your study data stays in this browser. No account or sync.</p>
+          <p className="privacy-note">Your study data stays in this browser. No account or sync. <Link className="text-link" href="/privacy">Privacy</Link> · <Link className="text-link" href="/terms">Terms</Link></p>
         </div>
       </main>
       {toast && <div className="toast" role="status">{toast}</div>}

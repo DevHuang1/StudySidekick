@@ -60,12 +60,18 @@ export default function RemindersPage() {
     setReminders((current) => current.map((item) => item.id === id ? { ...item, ...update } : item));
   }
 
+  // Parse-based ranks keep ISO instants and any unparseable legacy value in order.
+  const dueRank = (value: string | null) => {
+    if (!value) return Number.POSITIVE_INFINITY;
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? Number.POSITIVE_INFINITY : parsed;
+  };
   const sorted = [...reminders].sort((left, right) => {
     if (left.done !== right.done) return left.done ? 1 : -1;
-    if (left.dueAt && right.dueAt) return left.dueAt.localeCompare(right.dueAt);
-    if (left.dueAt) return -1;
-    if (right.dueAt) return 1;
-    return 0;
+    const leftRank = dueRank(left.dueAt);
+    const rightRank = dueRank(right.dueAt);
+    if (leftRank === rightRank) return 0;
+    return leftRank < rightRank ? -1 : 1;
   });
 
   return <>

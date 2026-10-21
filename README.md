@@ -15,11 +15,29 @@ npm run dev
 
 Open <http://localhost:3000>. No account, API key, AWS account, paid API, or physical device is needed. The planner, reminders, and timer work without a language model.
 
+## Deploy on Vercel
+
+The app deploys to [Vercel](https://vercel.com/new) as a standard Next.js project. Import the repository and Vercel reads `vercel.json`, which pins the framework, the install command (`npm ci`), and the build command (`npm run build`). Node.js 20.9 or newer is used (the range is declared in `package.json`).
+
+Set the server-side environment variables in the Vercel project (Settings → Environment Variables) for Production and Preview. Vercel does not read `.env.local`:
+
+- `GROQ_API_KEY` — optional; enables **Groq · cloud** on the deployed site.
+- `GROQ_MODEL` — optional; defaults to `openai/gpt-oss-20b`.
+- `ASSISTANT_ALLOWED_ORIGINS` — optional; comma-separated extra origins allowed to call `/api/assistant`, such as a custom domain used before the main domain moves.
+
+Leave `OLLAMA_BASE_URL` unset in the cloud environment. The assistant only contacts an explicitly configured loopback Ollama address, so on Vercel every **Local / guided** request falls back to guided actions without attempting a local connection; local AI works when the app runs on the same computer as Ollama.
+
+The assistant endpoint applies a best-effort per-IP rate limit (20 requests per minute) and rejects cross-origin browser requests. Limiting is per server instance, so it reduces abuse rather than eliminating it. The route declares a 50-second `maxDuration` so the host returns the provider's own error message instead of cutting the request off.
+
+Study data never leaves the browser. The deployment has no database, no account system, and no server-side storage; the only server-side work is the AI request you explicitly send.
+
+After the first deploy, check the landing page, all five tools, browser-storage persistence across a reload, `/privacy`, `/terms`, and the Sidekick guided fallback.
+
 ## Assignments, focus, and reminders
 
 Add or edit assignment details on the **Assignments** page. Estimates are total effort; completed planned time is tracked separately and the app shows what remains. Set your focus length and start a countdown on **Focus timer**; it continues while you navigate to another page. Keep a browser-only checklist on **Reminders**. Reminders do not send operating-system notifications.
 
-Assignments, availability, plans, completion state, reminders, focus-length preference, and any in-progress focus timer stay in this browser's local storage. Clearing browser storage removes that data. There is no account, sync, hosted database, or cloud hosting.
+Assignments, availability, plans, completion state, reminders, focus-length preference, and any in-progress focus timer stay in this browser's local storage. Clearing browser storage removes that data. There is no account, sync, or hosted database, and study data is never uploaded; the hosted deployment only processes the AI request you explicitly send (see [Privacy Policy](/privacy)).
 
 A running focus timer is stored as a wall-clock deadline rather than a countdown, so closing or reloading the tab does not lose the session; reopening the page shows the true time remaining. The seven-day window rolls forward on its own when the date changes, and assignment-level completion credit carries across the rollover. Reminder due times are stored as ISO 8601 instants so they stay sortable, and older records saved as display strings are migrated on load.
 
@@ -48,9 +66,9 @@ ollama serve
 ollama pull qwen3:4b
 ```
 
-The model is optional and runs on your computer. Ollama receives the prompt, recent chat, and current assignments and study hours on the local machine. If it is unavailable, **Local / guided** uses the guided actions and never falls back to Groq. Chat history is kept only for the current visit and is not written to browser storage.
+The model is optional and runs on your computer. Ollama receives the prompt, recent chat, and current assignments and study hours on the local machine. Ollama must run on the same computer as the app; the hosted deployment cannot reach it, so **Local / guided** there falls back to guided actions. If Ollama is unavailable locally, **Local / guided** uses guided actions and never falls back to Groq. Chat history is kept only for the current visit and is not written to browser storage.
 
-To enable Groq, create a Groq API key and put it in the server-side `.env.local` file:
+To enable Groq, create a Groq API key and put it in the server-side `.env.local` file for local development (or in the Vercel project settings when deployed):
 
 ```sh
 GROQ_API_KEY=your_key_here
@@ -70,6 +88,22 @@ For a repeatable recording, use a fresh browser profile rather than clearing exi
 
 The hackathon requires a repository link and a public video under three minutes on YouTube or Vimeo for the simulated experience path. Before submitting, confirm the repository is accessible and its open-source license is visible, add the project description, identify the Alexa+ track and any mini-challenges, and complete product feedback for every tool, API, or SDK used. A friction log is optional; only submit genuine, specific issues. Check the [official rules](https://amazonappdev2026.devpost.com/rules) for current requirements.
 
+### The `video/` project
+
+`video/` is a separate [Remotion](https://www.remotion.dev/) project for the promo video. It has its own `package.json` and `tsconfig.json` and its own dependencies, so it is kept out of the web app:
+
+- the root `tsconfig.json` excludes `video`, so `npm run typecheck` and `npm run build` never type-check Remotion sources;
+- `eslint.config.mjs` ignores `video/**`;
+- `.vercelignore` excludes `video/`, so the deployment upload stays limited to the app.
+
+Install and run it on its own from that directory:
+
+```sh
+cd video
+npm install
+npm run dev
+```
+
 ## Development checks
 
 ```sh
@@ -83,4 +117,4 @@ npm run build
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). The deployed app links the [Terms of Service](/terms) and [Privacy Policy](/privacy) from its footer and sidebar.

@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { assistantOutputSchema, assistantRequestSchema } from "../../../lib/assistant-schema";
 import { validateAssistantActions } from "../../../lib/assistant-actions";
 
-export const runtime = "nodejs";
+// The provider call has a 45s abort timeout. Tell the host that this route may
+// run up to 50s so it returns the readable provider error instead of a 504.
+export const maxDuration = 50;
 
 function guidedReply(message: string) {
   const lower = message.toLowerCase();
@@ -91,9 +93,60 @@ function parseModelJson(content: string): unknown {
   }
 }
 
-function localOllamaUrl(): string | null {
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX_REQUESTS = 20;
+const requestLog = new Map<string, number[]>();
+
+function clientAddress(request: Request): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0]?.trim() || "unknown";
+  return request.headers.get("x-real-ip") ?? "unknown";
+}
+
+/**
+ * Best-effort per-instance limiter. Serverless hosts may run several instances,
+ * so this raises the cost of abuse rather than providing a hard guarantee.
+ */
+function isRateLimited(address: string): boolean {
+  const now = Date.now();
+  const recent = (requestLog.get(address) ?? []).filter((at) => now - at < RATE_LIMIT_WINDOW_MS);
+  recent.push(now);
+  requestLog.set(address, recent);
+  if (requestLog.size > 1_000) {
+    for (const [key, times] of requestLog) {
+      if (times.every((at) => now - at >= RATE_LIMIT_WINDOW_MS)) requestLog.delete(key);
+    }
+  }
+  return recent.length > RATE_LIMIT_MAX_REQUESTS;
+}
+
+/** Keep other websites from spending this deployment's provider quota. */
+function isBlockedOrigin(request: Request): boolean {
+  const origin = request.headers.get("origin");
+  if (!origin) return false;
+  const allowed = (process.env.ASSISTANT_ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
   try {
-    const url = new URL(process.env.OLLAMA_BASE_URL || "http://localhost:11434");
+    return origin !== new URL(request.url).origin && !allowed.includes(origin);
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Resolve the local Ollama endpoint.
+ *
+ * Only an explicitly configured loopback address counts. A cloud host has no
+ * local Ollama, so it must fall back to guided actions instead of trying to
+ * reach its own loopback interface.
+ */
+function localOllamaUrl(): string | null {
+  const configured = process.env.OLLAMA_BASE_URL?.trim();
+  if (!configured) return null;
+  try {
+    const url = new URL(configured);
     if (url.protocol !== "http:" || !["localhost", "127.0.0.1", "[::1]", "::1"].includes(url.hostname)) return null;
     return `${url.origin}/api/chat`;
   } catch {
@@ -102,6 +155,13 @@ function localOllamaUrl(): string | null {
 }
 
 export async function POST(request: Request) {
+  if (isBlockedOrigin(request)) {
+    return NextResponse.json({ error: "Requests must come from the Study Sidekick app." }, { status: 403 });
+  }
+  if (isRateLimited(clientAddress(request))) {
+    return NextResponse.json({ error: "Too many requests. Wait a minute and try again." }, { status: 429 });
+  }
+
   let body: unknown;
   try {
     body = await request.json();
@@ -135,7 +195,7 @@ export async function POST(request: Request) {
   if (input.data.provider === "groq") {
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ error: "Groq is not configured on this server. Add GROQ_API_KEY to .env.local, then restart the app." }, { status: 503 });
+      return NextResponse.json({ error: "Groq is not configured on this server. Add GROQ_API_KEY to the server environment (on Vercel: Settings → Environment Variables), then redeploy." }, { status: 503 });
     }
 
     // The browser requires a per-request user confirmation. Keep the saved data

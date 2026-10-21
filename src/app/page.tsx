@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SiteFooter } from "@/components/site-footer";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const exampleDays = [
@@ -75,7 +76,7 @@ export default function LandingPage() {
       </section>
 
       <section className="landing-privacy" id="privacy" aria-labelledby="privacy-title">
-        <div><h2 id="privacy-title">Your study data stays in this browser.</h2><p>No account or cloud sync. Assignments and plans are saved on this device. Saved reminders are a checklist, not push notifications.</p></div>
+        <div><h2 id="privacy-title">Your study data stays in this browser.</h2><p>No account or cloud sync. Assignments and plans are saved on this device. Saved reminders are a checklist, not push notifications. <Link className="text-link" href="/privacy">Read the full privacy policy</Link>.</p></div>
         <Link href="/week" className="privacy-link">Make a plan <span aria-hidden="true">→</span></Link>
       </section>
 
@@ -85,7 +86,7 @@ export default function LandingPage() {
         <Link className="landing-button" href="/week">Build my week <span aria-hidden="true">→</span></Link>
       </section>
 
-      <footer className="landing-footer"><Link className="landing-brand" href="/" aria-label="Study Sidekick home"><span className="landing-brand-mark" aria-hidden="true">S</span><span>Study Sidekick</span></Link></footer>
+      <SiteFooter />
     </main>
   );
 }

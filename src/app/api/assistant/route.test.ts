@@ -5,6 +5,7 @@ const originalEnvironment = {
   GROQ_API_KEY: process.env.GROQ_API_KEY,
   GROQ_MODEL: process.env.GROQ_MODEL,
   OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL,
+  ASSISTANT_ALLOWED_ORIGINS: process.env.ASSISTANT_ALLOWED_ORIGINS,
 };
 const savedContext = {
   assignments: [{ id: "private-id-1", title: "PRIVATE HISTORY ESSAY", course: "History", dueDate: "2026-10-06", estimateMinutes: 180 }],
@@ -149,6 +150,50 @@ describe("Groq assistant provider", () => {
   });
 });
 
+describe("request guards", () => {
+  function postFrom(ip: string, origin?: string) {
+    return POST(new Request("http://localhost/api/assistant", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-forwarded-for": ip,
+        ...(origin ? { origin } : {}),
+      },
+      body: JSON.stringify({ message: "Remind me to stretch" }),
+    }));
+  }
+
+  it("rejects cross-origin browser requests", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("unavailable", { status: 503 })));
+
+    const response = await postFrom("203.0.113.10", "https://evil.example");
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toContain("Study Sidekick app");
+  });
+
+  it("allows an origin listed in ASSISTANT_ALLOWED_ORIGINS", async () => {
+    process.env.ASSISTANT_ALLOWED_ORIGINS = "https://preview.example";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("unavailable", { status: 503 })));
+
+    const response = await postFrom("203.0.113.11", "https://preview.example");
+
+    expect(response.status).toBe(200);
+  });
+
+  it("rate limits repeated requests from one address", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("unavailable", { status: 503 })));
+
+    const statuses: number[] = [];
+    for (let attempt = 0; attempt < 21; attempt += 1) {
+      statuses.push((await postFrom("203.0.113.12")).status);
+    }
+
+    expect(statuses.slice(0, 20).every((status) => status === 200)).toBe(true);
+    expect(statuses[20]).toBe(429);
+  });
+});
+
 describe("local and guided providers", () => {
   it("gives the local Ollama request its study context", async () => {
     process.env.OLLAMA_BASE_URL = "http://localhost:11434";
@@ -179,5 +224,18 @@ describe("local and guided providers", () => {
     expect(result.provider).toBe("guided");
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0][0])).toBe("http://127.0.0.1:11434/api/chat");
+  });
+
+  it("falls back to guided without a network call when no Ollama address is configured", async () => {
+    delete process.env.OLLAMA_BASE_URL;
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await postJson({ message: "Build my week", provider: "auto", studyContext: savedContext, today: "2026-10-02" });
+    const result = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(result.provider).toBe("guided");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
