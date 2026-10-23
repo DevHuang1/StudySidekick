@@ -1,12 +1,14 @@
 import { getWeekDates, localDateKey } from "@/lib/date-utils";
 import { newId } from "@/lib/format";
 import { normalizeAssignmentProgress } from "@/lib/progress";
+import { normalizeStudyLog, studyLogFromCompletedSessions } from "@/lib/study-log";
 import type {
   Assignment,
   DailyAvailability,
   Reminder,
   StoredFocusSession,
   StoredStudyData,
+  StudyLogEntry,
   WeeklyPlan,
 } from "@/lib/types";
 
@@ -25,6 +27,7 @@ export type StudySnapshot = {
   availability: DailyAvailability[];
   plan: WeeklyPlan | null;
   reminders: Reminder[];
+  studyLog: StudyLogEntry[];
   focusMinutes: number;
   focusSession: StoredFocusSession;
 };
@@ -94,8 +97,11 @@ function parseReminders(value: unknown): Reminder[] {
  * Anything unreadable is dropped rather than thrown on, so a corrupted key can
  * never stop the planner from opening.
  */
-/** Parsed storage always yields a focus session, even when the record predates it. */
-export type ParsedStudyData = Omit<StoredStudyData, "focusSession"> & { focusSession: StoredFocusSession };
+/** Parsed storage always yields a focus session and study log, even when the record predates them. */
+export type ParsedStudyData = Omit<StoredStudyData, "focusSession" | "studyLog"> & {
+  focusSession: StoredFocusSession;
+  studyLog: StudyLogEntry[];
+};
 
 export function parseStoredStudyData(raw: string | null, dates: string[], today: string): ParsedStudyData {
   const empty: ParsedStudyData = {
@@ -103,6 +109,7 @@ export function parseStoredStudyData(raw: string | null, dates: string[], today:
     availability: defaultAvailability(dates),
     plan: null,
     reminders: [],
+    studyLog: [],
     focusMinutes: 25,
     focusSession: { endsAt: null, pausedSeconds: null, durationMinutes: 25, sessionId: null },
   };
@@ -139,15 +146,22 @@ export function parseStoredStudyData(raw: string | null, dates: string[], today:
   // so a real 25-minute session is never rewritten to the default length.
   const focusSession = readFocusSession(saved.focusSession)
     ?? { endsAt: null, pausedSeconds: null, durationMinutes: focusMinutes, sessionId: null };
+  const normalizedAssignments = normalizeAssignmentProgress(savedAssignments, savedPlan?.sessions ?? []);
+  // Records created before Insights have no log; seed it once from their checked
+  // sessions. An explicitly empty array means the reader cleared their history.
+  const studyLog = Array.isArray(saved.studyLog)
+    ? normalizeStudyLog(saved.studyLog)
+    : studyLogFromCompletedSessions(savedPlan?.sessions ?? [], normalizedAssignments);
 
   return {
-    assignments: normalizeAssignmentProgress(savedAssignments, savedPlan?.sessions ?? []),
+    assignments: normalizedAssignments,
     availability: dates.map((date) => {
       const matching = savedAvailability.find((item) => item && typeof item === "object" && (item as DailyAvailability).date === date);
       return { date, minutes: clampMinutes((matching as DailyAvailability | undefined)?.minutes, 120, 720) };
     }),
     plan: savedPlan,
     reminders: parseReminders(saved.reminders),
+    studyLog,
     focusMinutes,
     focusSession,
   };
@@ -185,6 +199,7 @@ export function serverStudySnapshot(): StudySnapshot {
     availability: [],
     plan: null,
     reminders: [],
+    studyLog: [],
     focusMinutes: 25,
     focusSession: { endsAt: null, pausedSeconds: null, durationMinutes: 25, sessionId: null },
   };
@@ -222,6 +237,7 @@ export function readStudySnapshot(): StudySnapshot {
     availability: data.availability,
     plan: data.plan,
     reminders: data.reminders,
+    studyLog: data.studyLog,
     focusMinutes: data.focusMinutes,
     focusSession: data.focusSession,
   };

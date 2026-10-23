@@ -6,12 +6,13 @@ import { useStudy } from "@/app/study-provider";
 import { formatDate } from "@/lib/date-utils";
 import { formatMinutes } from "@/lib/format";
 import { completePlannedSession } from "@/lib/progress";
+import { addStudyLogEntry, createStudyLogEntry } from "@/lib/study-log";
 
 const PRESET_FOCUS_LENGTHS = [15, 25, 30, 45, 60];
 
 export default function FocusPage() {
   const {
-    dates, assignments, setAssignments, plan, setPlan,
+    dates, assignments, setAssignments, plan, setPlan, setStudyLog,
     focusMinutes, setFocusLength, timerDurationMinutes, secondsRemaining,
     timerRunning, activeFocusSessionId, clearFocusSession,
     startTimer, startPlannedFocus, pauseTimer, resumeTimer, resetTimer, setToast,
@@ -69,6 +70,9 @@ export default function FocusPage() {
     if (result.completed) {
       setPlan(result.plan);
       setAssignments(result.assignments);
+      if (activeSession && activeAssignment) {
+        setStudyLog((current) => addStudyLogEntry(current, createStudyLogEntry(activeSession, activeAssignment)));
+      }
       setToast(`Marked “${assignmentTitle}” complete.`);
     } else {
       setToast("That block has already changed in your plan.");

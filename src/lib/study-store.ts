@@ -1,6 +1,6 @@
 import { getWeekDates } from "@/lib/date-utils";
 import type { SetStateAction } from "react";
-import type { Assignment, DailyAvailability, Reminder, StoredStudyData, WeeklyPlan } from "@/lib/types";
+import type { Assignment, DailyAvailability, Reminder, StoredStudyData, StudyLogEntry, WeeklyPlan } from "@/lib/types";
 import {
   LEGACY_REMINDERS_KEY,
   readStudySnapshot,
@@ -76,6 +76,7 @@ function commit(next: StudySnapshot, persist: boolean) {
       availability: next.availability,
       plan: next.plan,
       reminders: next.reminders,
+      studyLog: next.studyLog,
       focusMinutes: next.focusMinutes,
       focusSession: next.focusSession,
     };
@@ -158,6 +159,10 @@ export function updatePlan(action: SetStateAction<WeeklyPlan | null>) {
 
 export function updateReminders(action: SetStateAction<Reminder[]>) {
   updateStudyData((current) => ({ ...current, reminders: resolve(action, current.reminders) }));
+}
+
+export function updateStudyLog(action: SetStateAction<StudyLogEntry[]>) {
+  updateStudyData((current) => ({ ...current, studyLog: resolve(action, current.studyLog) }));
 }
 
 export function updateFocusMinutes(minutes: number) {

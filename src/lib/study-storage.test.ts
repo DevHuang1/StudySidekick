@@ -192,6 +192,69 @@ describe("parseStoredStudyData", () => {
     const raw = JSON.stringify({ reminders: [{ id: "r1", text: "Broken", dueAt: "sometime soon", done: false }] });
     expect(parseStoredStudyData(raw, dates, today).reminders[0].dueAt).toBeNull();
   });
+
+  it("starts new browser records with an empty study log", () => {
+    expect(parseStoredStudyData(null, dates, today).studyLog).toEqual([]);
+  });
+
+  it("backfills a missing study log from checked plan sessions", () => {
+    const raw = JSON.stringify({
+      assignments: [assignment],
+      plan: {
+        sessions: [
+          { id: "done", assignmentId: "essay", date: today, minutes: 30, completed: true },
+          { id: "open", assignmentId: "essay", date: dates[1], minutes: 45, completed: false },
+        ],
+        generatedAt: "2026-10-06T09:00:00.000Z",
+        weekStart: today,
+        inputSignature: "saved",
+      },
+    });
+    const log = parseStoredStudyData(raw, dates, today).studyLog;
+
+    expect(log).toHaveLength(1);
+    expect(log[0]).toMatchObject({
+      id: "done",
+      assignmentId: "essay",
+      title: "History essay",
+      course: "History",
+      date: today,
+      minutes: 30,
+    });
+  });
+
+  it("respects an explicitly cleared study log instead of backfilling it again", () => {
+    const raw = JSON.stringify({
+      assignments: [assignment],
+      studyLog: [],
+      plan: {
+        sessions: [{ id: "done", assignmentId: "essay", date: today, minutes: 30, completed: true }],
+        generatedAt: "2026-10-06T09:00:00.000Z",
+        weekStart: today,
+        inputSignature: "saved",
+      },
+    });
+
+    expect(parseStoredStudyData(raw, dates, today).studyLog).toEqual([]);
+  });
+
+  it("restores a persisted study log with its snapshot details", () => {
+    const raw = JSON.stringify({
+      studyLog: [{
+        id: "done",
+        assignmentId: "essay",
+        title: "Older title",
+        course: "History",
+        date: today,
+        minutes: 30,
+        completedAt: "2026-10-06T18:00:00.000Z",
+      }],
+    });
+    const log = parseStoredStudyData(raw, dates, today).studyLog;
+
+    expect(log[0].title).toBe("Older title");
+    expect(log[0].completedAt).toBe("2026-10-06T18:00:00.000Z");
+  });
 });
 
 describe("parseLegacyReminders", () => {

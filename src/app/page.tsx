@@ -9,10 +9,12 @@ const exampleDays = [
 ];
 
 const features = [
-  { title: "A week that fits", text: "Turn deadlines into short sessions around the hours you have.", href: "/week", link: "Open planner" },
-  { title: "Progress you can see", text: "Check off sessions and see your completed study time add up.", href: "/week", link: "View progress" },
+  { title: "A week that fits", text: "Turn deadlines into short sessions around the hours you have. Export the week to your calendar.", href: "/week", link: "Open planner" },
+  { title: "A guided sidekick", text: "Describe what changed and review the actions before saving anything.", href: "/sidekick", link: "Ask Sidekick" },
+  { title: "Assignments in one place", text: "Keep due dates and total effort together, with done and remaining time.", href: "/assignments", link: "View assignments" },
   { title: "A simple focus timer", text: "Give one task your attention, one session at a time.", href: "/focus", link: "Open timer" },
   { title: "Reminders, kept here", text: "A browser-only checklist. It does not send notifications.", href: "/reminders", link: "View reminders" },
+  { title: "Progress you can see", text: "Check off blocks and watch a seven-day record add up by day and course.", href: "/insights", link: "View insights" },
 ];
 
 export default function LandingPage() {
@@ -76,7 +78,7 @@ export default function LandingPage() {
       </section>
 
       <section className="landing-privacy" id="privacy" aria-labelledby="privacy-title">
-        <div><h2 id="privacy-title">Your study data stays in this browser.</h2><p>No account or cloud sync. Assignments and plans are saved on this device. Saved reminders are a checklist, not push notifications. <Link className="text-link" href="/privacy">Read the full privacy policy</Link>.</p></div>
+        <div><h2 id="privacy-title">Your study data stays in this browser.</h2><p>No account or cloud sync. Assignments, plans, and study history are saved on this device. Saved reminders are a checklist, not push notifications. <Link className="text-link" href="/privacy">Read the full privacy policy</Link>.</p></div>
         <Link href="/week" className="privacy-link">Make a plan <span aria-hidden="true">→</span></Link>
       </section>
 

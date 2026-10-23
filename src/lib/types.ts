@@ -41,6 +41,19 @@ export type Reminder = {
   done: boolean;
 };
 
+/** A permanently credited study block, kept after its week rolls out of view. */
+export type StudyLogEntry = {
+  /** Same id as the plan session it came from, so unchecking can remove it. */
+  id: string;
+  assignmentId: string;
+  /** Snapshot fields keep history readable after an assignment is edited or removed. */
+  title: string;
+  course: string;
+  date: string;
+  minutes: number;
+  completedAt: string;
+};
+
 export type AssistantAction =
   | { type: "add_assignment"; title: string; course: string; dueDate: string; estimateMinutes: number }
   | { type: "update_assignment"; assignmentId: string; changes: Partial<Pick<Assignment, "title" | "course" | "dueDate" | "estimateMinutes">> }
@@ -84,6 +97,7 @@ export type StoredStudyData = {
   availability: DailyAvailability[];
   plan: WeeklyPlan | null;
   reminders: Reminder[];
+  studyLog?: StudyLogEntry[];
   focusMinutes: number;
   /** Present since the focus timer became reload-safe; older records omit it. */
   focusSession?: StoredFocusSession;

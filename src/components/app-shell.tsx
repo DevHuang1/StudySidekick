@@ -15,6 +15,7 @@ const pages = [
   { href: "/assignments", label: "Assignments", icon: "✎" },
   { href: "/focus", label: "Focus timer", icon: "◷" },
   { href: "/reminders", label: "Reminders", icon: "♧" },
+  { href: "/insights", label: "Insights", icon: "◔" },
 ];
 
 const standalonePages = new Set(["/", "/privacy", "/terms"]);
@@ -36,9 +37,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="app-shell min-h-screen">
       <aside className="sidebar" aria-label="App navigation">
         <Link className="brand" href="/week" aria-label="Study Sidekick weekly plan"><span className="brand-mark" aria-hidden="true">S</span><span className="brand-name">Study <span>Sidekick</span></span></Link>
-        {pages.map((page) => <Link className={`nav-link${pathname === page.href ? " active" : ""}`} href={page.href} key={page.href} aria-label={page.label} title={page.label} aria-current={pathname === page.href ? "page" : undefined}>
-          <span className="nav-icon" aria-hidden="true">{page.icon}</span><span className="nav-copy">{page.label}</span>
-        </Link>)}
+        <nav className="sidebar-nav" aria-label="Study tools">
+          {pages.map((page) => <Link className={`nav-link${pathname === page.href ? " active" : ""}`} href={page.href} key={page.href} aria-label={page.label} title={page.label} aria-current={pathname === page.href ? "page" : undefined}>
+            <span className="nav-icon" aria-hidden="true">{page.icon}</span><span className="nav-copy">{page.label}</span>
+          </Link>)}
+        </nav>
         <div className="sidebar-footer">
           <div className="sidebar-session">
             <span className="sidebar-avatar" aria-hidden="true">{session.username.charAt(0)}</span>

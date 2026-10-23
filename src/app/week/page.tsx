@@ -9,11 +9,13 @@ import { formatDate, formatDueDate } from "@/lib/date-utils";
 import { formatHours, formatMinutes } from "@/lib/format";
 import { applySessionCompletion } from "@/lib/progress";
 import { buildSchedule, completedSessionsForWeek, moveSession, planInputSignature } from "@/lib/scheduler";
+import { addStudyLogEntry, createStudyLogEntry, removeStudyLogEntry } from "@/lib/study-log";
+import { ExportCalendarButton } from "@/components/export-calendar-button";
 
 type PendingMove = { sessionId: string; date: string } | null;
 
 export default function WeeklyPlanPage() {
-  const { today, dates, assignments, setAssignments, availability, setAvailability, plan, setPlan, timerRunning, startPlannedFocus, setToast } = useStudy();
+  const { today, dates, assignments, setAssignments, availability, setAvailability, plan, setPlan, setStudyLog, timerRunning, startPlannedFocus, setToast } = useStudy();
   const router = useRouter();
   const [pendingMove, setPendingMove] = useState<PendingMove>(null);
   const [moveError, setMoveError] = useState("");
@@ -70,8 +72,13 @@ export default function WeeklyPlanPage() {
   function toggleSession(sessionId: string, completed: boolean) {
     const target = sessions.find((session) => session.id === sessionId);
     if (!target || target.completed === completed) return;
+    const assignment = assignments.find((item) => item.id === target.assignmentId);
+    if (!assignment) return;
     setPlan((current) => current ? { ...current, sessions: current.sessions.map((session) => session.id === sessionId ? { ...session, completed } : session) } : current);
     setAssignments((current) => applySessionCompletion(current, target, target.completed, completed));
+    setStudyLog((current) => completed
+      ? addStudyLogEntry(current, createStudyLogEntry(target, assignment))
+      : removeStudyLogEntry(current, target.id));
   }
 
   function startFocus(sessionId: string, minutes: number) {
@@ -110,7 +117,7 @@ export default function WeeklyPlanPage() {
   if (!today) return null;
 
   return <>
-    <PageHeading title="A week you can breathe through" description="Turn due dates into small, realistic study blocks. You choose the hours; your plan stays adjustable." aside={<div className="week-chip">{formatDate(today, { month: "long", day: "numeric" })} — {formatDate(horizonEnd, { month: "long", day: "numeric" })}</div>} />
+    <PageHeading title="A week you can breathe through" description="Turn due dates into small, realistic study blocks. You choose the hours; your plan stays adjustable." aside={<div className="page-heading-actions"><div className="week-chip">{formatDate(today, { month: "long", day: "numeric" })} — {formatDate(horizonEnd, { month: "long", day: "numeric" })}</div><ExportCalendarButton /></div>} />
 
     <div className="weekly-page">
     <section className="hero-card" aria-label="Weekly progress">

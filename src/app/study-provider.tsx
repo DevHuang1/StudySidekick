@@ -27,8 +27,9 @@ import {
   updateFocusSession as storeUpdateFocusSession,
   updatePlan as storeUpdatePlan,
   updateReminders as storeUpdateReminders,
+  updateStudyLog as storeUpdateStudyLog,
 } from "@/lib/study-store";
-import type { Assignment, DailyAvailability, Reminder, WeeklyPlan } from "@/lib/types";
+import type { Assignment, DailyAvailability, Reminder, StudyLogEntry, WeeklyPlan } from "@/lib/types";
 
 export type StudyContextValue = {
   today: string | null;
@@ -42,6 +43,8 @@ export type StudyContextValue = {
   setPlan: (action: SetStateAction<WeeklyPlan | null>) => void;
   reminders: Reminder[];
   setReminders: (action: SetStateAction<Reminder[]>) => void;
+  studyLog: StudyLogEntry[];
+  setStudyLog: (action: SetStateAction<StudyLogEntry[]>) => void;
   focusMinutes: number;
   setFocusLength: (minutes: number) => void;
   timerDurationMinutes: number;
@@ -65,7 +68,7 @@ function safeDuration(minutes: number): number {
 }
 
 export function StudyProvider({ children }: { children: ReactNode }) {
-  const { hydrated, today, dates, assignments, availability, plan, reminders, focusMinutes, focusSession } =
+  const { hydrated, today, dates, assignments, availability, plan, reminders, studyLog, focusMinutes, focusSession } =
     useSyncExternalStore(subscribeToStudy, getStudySnapshot, getServerStudySnapshot);
 
   // Subscribing only while a timer is running keeps the clock store idle otherwise.
@@ -79,6 +82,7 @@ export function StudyProvider({ children }: { children: ReactNode }) {
   const setAvailability = useCallback((action: SetStateAction<DailyAvailability[]>) => storeUpdateAvailability(action), []);
   const setPlan = useCallback((action: SetStateAction<WeeklyPlan | null>) => storeUpdatePlan(action), []);
   const setReminders = useCallback((action: SetStateAction<Reminder[]>) => storeUpdateReminders(action), []);
+  const setStudyLog = useCallback((action: SetStateAction<StudyLogEntry[]>) => storeUpdateStudyLog(action), []);
   const setToast = useCallback((message: string) => setToastState(message), []);
 
   const endsAtMs = endsAt ? Date.parse(endsAt) : null;
@@ -195,6 +199,8 @@ export function StudyProvider({ children }: { children: ReactNode }) {
     setPlan,
     reminders,
     setReminders,
+    studyLog,
+    setStudyLog,
     focusMinutes,
     setFocusLength,
     timerDurationMinutes: focusSession.durationMinutes,
@@ -210,7 +216,7 @@ export function StudyProvider({ children }: { children: ReactNode }) {
     toast,
     setToast,
   }), [hydrated, today, dates, assignments, setAssignments, availability, setAvailability, plan, setPlan,
-    reminders, setReminders, focusMinutes, setFocusLength, focusSession, secondsRemaining, timerRunning,
+    reminders, setReminders, studyLog, setStudyLog, focusMinutes, setFocusLength, focusSession, secondsRemaining, timerRunning,
     clearFocusSession, startTimer, startPlannedFocus, pauseTimer, resumeTimer, resetTimer, toast, setToast]);
 
   return <StudyContext.Provider value={value}>{children}</StudyContext.Provider>;

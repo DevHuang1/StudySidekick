@@ -28,7 +28,7 @@ export default function PrivacyPage() {
 
       <article className="legal-body">
         <h1>Privacy Policy</h1>
-        <p className="legal-updated">Last updated: October 12, 2026</p>
+        <p className="legal-updated">Last updated: October 23, 2026</p>
 
         <section>
           <h2>The short version</h2>
@@ -46,10 +46,11 @@ export default function PrivacyPage() {
             <li>assignments, due dates, and effort estimates;</li>
             <li>your available study hours and saved weekly plans;</li>
             <li>completion state and your focus-length preference;</li>
+            <li>a history of checked-off study blocks used by Insights;</li>
             <li>reminders you add;</li>
             <li>an in-progress focus timer deadline.</li>
           </ul>
-          <p>This data stays on your device. Clearing this browser&rsquo;s site data removes it, and the app never uploads it on its own.</p>
+          <p>This data stays on your device. Clearing this browser&rsquo;s site data removes it, and the app never uploads it on its own. Calendar files are generated in your browser and are only saved when you download them.</p>
         </section>
 
         <section>
