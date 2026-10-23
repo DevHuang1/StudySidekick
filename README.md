@@ -13,7 +13,7 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:3000>. No account, API key, AWS account, paid API, or physical device is needed. The planner, reminders, and timer work without a language model.
+Open <http://localhost:3000>. The five tool pages use a local demo login: choose **User** or **Judge**, then enter `DEVPOST` (the password is also shown on the login screen). It is a browser-only gate and creates no account. No API key, AWS account, paid API, or physical device is needed. The planner, reminders, and timer work without a language model.
 
 ## Deploy on Vercel
 
@@ -79,7 +79,7 @@ Restart the dev server, then select **Groq · cloud** on Sidekick. Before every 
 
 ## Demo recording flow
 
-For a repeatable recording, use a fresh browser profile rather than clearing existing browser data. Configure the server-side Groq key as described above, start the app, and select **Groq · cloud** on **Sidekick**.
+For a repeatable recording, use a fresh browser profile rather than clearing existing browser data. At the demo login, choose **Judge** and enter `DEVPOST`. Configure the server-side Groq key as described above, start the app, and select **Groq · cloud** on **Sidekick**.
 
 1. Select **Try demo request**. It fills the message box with a request using today and tomorrow's dates; it does not send anything. The example adds a 3-hour Biology lab report due tomorrow, sets study time to 90 minutes today and 30 minutes tomorrow, asks for a week plan and reminder, and starts a 25-minute focus session.
 2. Choose **Ask Sidekick**, confirm the per-request Groq notice, and leave **Also include saved assignments and study hours** unchecked. The prompt contains the new assignment and exact dates; the schedule preview is calculated locally from browser data.
